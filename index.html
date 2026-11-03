@@ -1,0 +1,1021 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Falcon Logs</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1A2124" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Falcon Logs">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<style>
+html{color-scheme:light}:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}
+/* Layout: single phone column, sticky header, fixed bottom action bar, bottom-sheet forms; log strip as the signature element */
+:root{
+  --bg:#ECEFEA; --surface:#FFFFFF; --sunk:#F5F7F3; --ink:#16222A; --muted:#5A6870; --line:#D2D9D1;
+  --accent:#D9480F; --accent-ink:#FFFFFF; --blue:#1C5A9C; --ok:#2B7A3D; --warn:#B26A00; --bad:#B42318;
+  --grav:#C9A46A; --sand:#E9CF76; --silt:#B9BE8E; --clay:#8DA2B4; --org:#6E5843; --fill:#A7A7A1; --rock:#5C646B; --pave:#2F3336; --none:#E2E6E0;
+  --display:"sans-serif-condensed","Roboto Condensed","Arial Narrow",sans-serif;
+  --body:Roboto,system-ui,sans-serif;
+  --mono:"Roboto Mono","Droid Sans Mono",monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#111618; --surface:#1A2124; --sunk:#151B1D; --ink:#E5ECE7; --muted:#95A39F; --line:#2D383B;
+  --accent:#FF7A3D; --accent-ink:#1A0E06; --blue:#7DB2EA; --ok:#6CC383; --warn:#F2B44C; --bad:#FF8A80;
+  --grav:#A88653; --sand:#C7AD57; --silt:#949A6C; --clay:#6F8597; --org:#7E6650; --fill:#7F807B; --rock:#4C545A; --pave:#0B0D0E; --none:#263033;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#111618; --surface:#1A2124; --sunk:#151B1D; --ink:#E5ECE7; --muted:#95A39F; --line:#2D383B;
+  --accent:#FF7A3D; --accent-ink:#1A0E06; --blue:#7DB2EA; --ok:#6CC383; --warn:#F2B44C; --bad:#FF8A80;
+  --grav:#A88653; --sand:#C7AD57; --silt:#949A6C; --clay:#6F8597; --org:#7E6650; --fill:#7F807B; --rock:#4C545A; --pave:#0B0D0E; --none:#263033;
+  color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.45;-webkit-tap-highlight-color:transparent}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--surface)}
+button,input,select,textarea{font:inherit;color:inherit}
+.wrap{max-width:720px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--surface);border-bottom:1px solid var(--line)}
+header.top .wrap{display:flex;align-items:center;gap:10px;padding-block:10px;min-height:56px}
+.back{border:0;background:none;padding:6px 8px 6px 0;color:var(--blue);font-weight:600;cursor:pointer;white-space:nowrap}
+.htitle{flex:1;min-width:0;font-family:var(--display);font-weight:700;font-size:22px;letter-spacing:.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pill{font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;padding:3px 8px;border-radius:99px;border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+.pill.ok{color:var(--ok);border-color:currentColor}.pill.warn{color:var(--warn);border-color:currentColor}.pill.ex{color:var(--blue);border-color:currentColor}
+main.wrap{padding-block:16px 120px;display:flex;flex-direction:column;gap:18px}
+h2{font-family:var(--display);font-weight:700;font-size:28px;line-height:1.1;margin:0;text-wrap:balance}
+h3{font-family:var(--display);font-weight:600;font-size:15px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0}
+.meta{color:var(--muted);font-size:14px}
+.list{display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.row{display:flex;align-items:center;gap:12px;padding:14px;border:0;border-bottom:1px solid var(--line);background:none;text-align:left;width:100%;cursor:pointer}
+.row:last-child{border-bottom:0}
+.row:active{background:var(--sunk)}
+.row .main{flex:1;min-width:0}
+.row .t{font-weight:600}
+.row .s{color:var(--muted);font-size:14px;overflow:hidden;text-overflow:ellipsis}
+.depth{font-family:var(--mono);font-weight:600;font-size:14px;min-width:86px;font-variant-numeric:tabular-nums}
+.depth small{display:block;color:var(--muted);font-weight:500;font-size:12px}
+.sw{width:14px;align-self:stretch;border-radius:3px;flex:none}
+.empty{padding:18px;color:var(--muted);text-align:center;font-size:15px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:0 18px;border-radius:10px;border:1px solid var(--line);background:var(--surface);font-weight:600;cursor:pointer}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.blue{color:var(--blue);border-color:var(--blue)}
+.btn.danger{color:var(--bad);border-color:var(--bad);background:none}
+.btn.ghost{border-color:transparent;background:none;color:var(--blue)}
+.btn.full{width:100%}
+.btn:focus-visible,.chip:focus-visible,.row:focus-visible,.tab:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
+.actions{display:flex;flex-wrap:wrap;gap:10px}
+.actions .btn{flex:1 1 160px}
+.bar{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--surface);border-top:1px solid var(--line);padding-bottom:calc(10px + env(safe-area-inset-bottom,0px))}
+.bar .wrap{padding-top:10px;display:flex;gap:10px}
+.bar .btn{flex:1}
+/* boring summary */
+.summary{display:grid;grid-template-columns:128px 1fr;gap:14px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px}
+.strip{position:relative;height:300px;margin-top:14px;display:grid;grid-template-columns:24px 32px 1fr;font-family:var(--mono);font-size:10px;color:var(--muted)}
+.ticks,.col,.samps{position:relative}
+.ticks span{position:absolute;right:4px;transform:translateY(-50%);font-variant-numeric:tabular-nums}
+.col{border:1.5px solid var(--ink);background:var(--none);overflow:hidden}
+.col i{position:absolute;left:0;right:0;border-bottom:1px solid var(--ink)}
+.col i.fill{background-image:repeating-linear-gradient(45deg,var(--fill) 0 4px,transparent 4px 7px)}
+.samps b{position:absolute;left:3px;width:8px;background:var(--ink);border-radius:1px}
+.samps em{position:absolute;left:15px;transform:translateY(-50%);font-style:normal;font-family:var(--mono);font-weight:600;font-size:11px;line-height:1;color:var(--ink);white-space:nowrap;font-variant-numeric:tabular-nums}
+.samps em.ref{color:var(--accent)}
+.samps .ncap{position:absolute;left:15px;top:-15px;font-size:10px;letter-spacing:.06em;color:var(--muted)}
+.wl{position:absolute;left:24px;width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-top:9px solid var(--blue);transform:translateY(-100%)}
+.facts{display:grid;grid-template-columns:1fr 1fr;gap:12px 10px;align-content:start;min-width:0}
+.fact .k{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.fact .v{font-family:var(--mono);font-weight:600;font-size:17px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.facts .actions{grid-column:1/-1}
+.tabs{display:flex;gap:4px;background:var(--sunk);border:1px solid var(--line);border-radius:10px;padding:4px;overflow-x:auto}
+.tab{flex:1;min-height:42px;border:0;border-radius:7px;background:none;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap;padding:0 10px}
+.tab.on{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.tab em{font-style:normal;font-family:var(--mono);font-size:12px;margin-left:4px;color:var(--muted)}
+/* sheet */
+.sheet{position:fixed;inset:0;z-index:20;display:flex;align-items:flex-end;justify-content:center;background:rgba(10,14,16,.5)}
+.panel{background:var(--surface);width:100%;max-width:720px;max-height:92%;overflow-y:auto;border-radius:16px 16px 0 0;padding-block:6px calc(18px + env(safe-area-inset-bottom,0px));padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.grab{width:40px;height:4px;border-radius:2px;background:var(--line);margin:6px auto 10px}
+.phead{display:flex;align-items:baseline;gap:10px;margin-bottom:12px}
+.phead h2{flex:1;font-size:24px}
+.sec{margin:18px 0 8px;padding-top:12px;border-top:1px solid var(--line)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.fld{display:flex;flex-direction:column;gap:5px;grid-column:1/-1;min-width:0}
+.fld.half{grid-column:auto}
+.lbl{font-size:14px;font-weight:600}
+.lbl i{font-style:normal;font-weight:500;color:var(--muted);font-family:var(--mono);font-size:12px}
+.req{font-weight:600;font-size:11px;color:var(--accent);text-transform:uppercase;letter-spacing:.05em}
+.fld small{color:var(--muted);font-size:13px}
+input,select,textarea{width:100%;min-height:46px;border:1px solid var(--line);border-radius:8px;background:var(--sunk);padding:10px 12px;font-size:16px}
+input.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+textarea{min-height:84px;resize:vertical}
+.bad-in{border-color:var(--bad)!important}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{min-height:40px;padding:0 12px;border-radius:8px;border:1px solid var(--line);background:var(--sunk);font-weight:500;cursor:pointer;font-size:15px}
+.chip.on{background:var(--blue);border-color:var(--blue);color:var(--surface)}
+.chips.quick{margin-top:2px}
+.grid>.sec{grid-column:1/-1}
+.qchip{min-height:34px;padding:0 10px;border-radius:8px;border:1px dashed var(--line);background:none;color:var(--blue);font-size:14px;cursor:pointer}
+.chips.uscs .chip{font-family:var(--mono);font-size:13px;min-width:62px;padding:0 8px}
+.blows{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.stepper{display:flex;flex-direction:column;align-items:stretch;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--sunk)}
+.stepper .cap{font-size:11px;text-align:center;color:var(--muted);padding-top:4px;text-transform:uppercase;letter-spacing:.05em}
+.stepper input{border:0;background:none;text-align:center;font-family:var(--mono);font-size:24px;font-weight:600;min-height:44px;padding:0}
+.stepper .pm{display:grid;grid-template-columns:1fr 1fr;border-top:1px solid var(--line)}
+.stepper button{min-height:44px;border:0;background:var(--surface);font-size:22px;font-weight:600;cursor:pointer}
+.stepper button+button{border-left:1px solid var(--line)}
+.calc{display:flex;flex-wrap:wrap;gap:8px 18px;padding:12px;border-radius:8px;background:var(--sunk);font-family:var(--mono);font-size:15px;font-variant-numeric:tabular-nums}
+.calc b{color:var(--accent)}
+.hint{padding:10px 12px;border-left:3px solid var(--blue);background:var(--sunk);border-radius:0 8px 8px 0;font-size:14px}
+.err{color:var(--bad);font-weight:600;font-size:14px}
+.issues{display:flex;flex-direction:column;gap:6px;margin:0;padding:0;list-style:none}
+.issues li{padding:10px 12px;border-radius:8px;background:var(--sunk);font-size:14px;border-left:3px solid var(--warn)}
+.issues li.e{border-left-color:var(--bad)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(90px + env(safe-area-inset-bottom,0px));z-index:30;background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;font-weight:600;max-width:calc(100% - 32px)}
+.note{color:var(--muted);font-size:13px}
+.credit{margin:8px 0 0;text-align:center;color:var(--muted);font-size:13px;letter-spacing:.03em}
+@media (max-width:380px){.summary{grid-template-columns:118px 1fr}.facts{grid-template-columns:1fr}.blows{gap:5px}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+</head><body>
+<div id="app"></div>
+<div id="sheet" class="sheet" hidden><div class="panel" id="panel" role="dialog" aria-modal="true"></div></div>
+<div id="toast" class="toast" hidden></div>
+
+<script>
+/* ---------- picklists (values match the gINT import example) ---------- */
+const L={
+  SampleType:["SS","ST","CS","GB","AU","HQ","NQ","PQ","BULK","LS","DP"],
+  DrillMethod:["Hollow Augers","Solid Stem Auger","Mud Rotary","Air Rotary","Sonic","Direct Push","Hand Auger","HQ Core","NQ Core","Test Pit"],
+  HammerType:["Automatic","Safety (rope & cathead)","Donut","Wireline"],
+  USCS:["GW","GP","GM","GC","GW-GM","GW-GC","GP-GM","GP-GC","SW","SP","SM","SC","SW-SM","SW-SC","SP-SM","SP-SC","SC-SM","ML","CL","CL-ML","OL","MH","CH","OH","PT","TOPSOIL","ABC","ASPHALT","CONCRETE"],
+  Moisture:["Dry","Moist","Wet","Saturated"],
+  Consistency:["Very Soft","Soft","Medium Stiff","Stiff","Very Stiff","Hard"],
+  Density:["Very Loose","Loose","Medium Dense","Dense","Very Dense"],
+  Shade:["Light","Dark"],
+  ColorMod:["Reddish","Yellowish","Grayish","Mottled"],
+  Color:["Brown","Tan","Gray","Red","Orange","Yellow","Olive","Black","White","Red-Tan","Red-Brown"],
+  ColorConj:["and","-"],
+  ClassMod:["Sandy","Silty","Clayey","Gravelly","Micaceous","Slightly"],
+  ClassCon:["trace","with","little","some"],
+  Remarks1:["Rock Fragments","Organics","Gravel","Roots","Mica","Quartz"],
+  Rock:["Metavolcanic Rock","Metasedimentary Rock","Granite","Gneiss","Schist","Phyllite","Diabase"],
+  PointType:["SPT","Hand Auger"],
+  Termination:["Boring Terminated","Auger Refusal"],
+  InOn:["in","on"],
+  GW:["Dry","Water","Not checked"],
+  LineType:["Blank","1"],
+};
+const LAB=["MC","LL/PL","-200","Gradation","Hydrometer","Proctor","CBR","UU","Consol","Organic","pH/Res"];
+const ORIGIN=["Artificial Fill","Roadway Embankment","Alluvium","Residuum","PWR","WR","NCR","CR","Other"];
+/* What each origin prints as in gINT's Origin / Term_Origin fields. */
+const ORIGIN_OUT={"Artificial Fill":"FILL","PWR":"PARTIALLY WEATHERED ROCK","WR":"WEATHERED ROCK","NCR":"NON-CRYSTALLINE ROCK","CR":"CRYSTALLINE ROCK"};
+const ROCKY=new Set(["PWR","WR","NCR","CR"]);
+const FILLY=new Set(["Artificial Fill","Roadway Embankment"]);
+/* Surface layers: their own origin text and graphic, thickness written in inches. */
+const SURFACE={TOPSOIL:{origin:"TOPSOIL",graphic:"TOPSOIL"},ABC:{origin:"GRAVEL",graphic:"ABC"},ASPHALT:{origin:"ASPHALT",graphic:"ASPHALT"},CONCRETE:{origin:"CONCRETE",graphic:"CONCRETE"}};
+const isOtherOrigin=v=>!!v&&!ORIGIN.includes(v);
+function readOrigin(out){if(out.Geology==="Other")out.Geology=(out.OriginOther||"").trim()||"Other";delete out.OriginOther;return out}
+const NAMES={GW:"Well-graded GRAVEL",GP:"Poorly graded GRAVEL",GM:"Silty GRAVEL",GC:"Clayey GRAVEL","GW-GM":"Well-graded GRAVEL with silt","GW-GC":"Well-graded GRAVEL with clay","GP-GM":"Poorly graded GRAVEL with silt","GP-GC":"Poorly graded GRAVEL with clay",SW:"Well-graded SAND",SP:"Poorly graded SAND",SM:"Silty SAND",SC:"Clayey SAND","SW-SM":"Well-graded SAND with silt","SW-SC":"Well-graded SAND with clay","SP-SM":"Poorly graded SAND with silt","SP-SC":"Poorly graded SAND with clay","SC-SM":"Silty, clayey SAND",ML:"SILT",CL:"Lean CLAY","CL-ML":"Silty CLAY",OL:"Organic SILT",MH:"Elastic SILT",CH:"Fat CLAY",OH:"Organic CLAY",PT:"PEAT"};
+const FINE=new Set(["ML","CL","CL-ML","OL","MH","CH","OH","PT"]);
+const CORE=new Set(["CS","HQ","NQ","PQ"]);
+
+/* ---------- field specs ---------- */
+const PROJ_F=[
+ {k:"ProjectID",l:"Project number",req:1,h:"Exports as Number, e.g. G26002.00"},{k:"ProjectName",l:"Project name",req:1},
+ {k:"Client",l:"Client"},{k:"Location",l:"Location",h:"City, state"},{k:"County",l:"County"}];
+const BOR_F=[
+ {sec:"Identification"},
+ {k:"PointID",l:"Boring ID",req:1,h:"Must be unique in this project, e.g. B-1001"},
+ {k:"PointType",l:"Type",t:"chips",o:L.PointType},
+ {k:"DateStarted",l:"Date started",t:"date",w:"half"},{k:"DateCompleted",l:"Date completed",t:"date",w:"half"},
+ {sec:"Location"},{gps:1},
+ {k:"Easting",l:"East",u:"ft",t:"num",w:"half"},{k:"Northing",l:"North",u:"ft",t:"num",w:"half",h:"NC State Plane (NAD83, US ft). Filled from GPS."},
+ {k:"Elevation",l:"Ground elev.",u:"ft",t:"num",w:"half",neg:1},{k:"GPS_Accuracy",l:"GPS accuracy",u:"ft",t:"num",w:"half"},
+ {k:"Latitude",l:"Latitude",u:"deg",t:"num",w:"half",neg:1},{k:"Longitude",l:"Longitude",u:"deg",t:"num",w:"half",neg:1},
+ {k:"Alignment",l:"Alignment",h:"Optional, e.g. 01 South"},
+ {k:"Station",l:"Station",t:"num",w:"half"},{k:"Offset",l:"Offset",u:"ft",t:"num",w:"half",neg:1},
+ {sec:"Crew"},
+ {k:"LoggedBy",l:"Geologist",w:"half",h:"e.g. Goodnight, D."},{k:"Driller",l:"Driller",w:"half",h:"e.g. Rascot, R."},
+ {k:"DrillingContractor",l:"Drilling contractor"},
+ {sec:"Rig and hammer"},
+ {k:"DrillRig",l:"Drill machine",h:"e.g. CME 55 Truck, Geoprobe"},
+ {k:"DrillMethod",l:"Drill method",t:"select",o:L.DrillMethod},
+ {k:"HammerType",l:"Hammer type",t:"chips",o:L.HammerType},
+ {k:"BoreholeDiam_in",l:"Hole diameter",u:"in",t:"num",w:"half"},{k:"HammerEfficiency_pct",l:"Hammer ER",u:"%",t:"num",w:"half"},
+ {k:"HammerWeight_lb",l:"Hammer weight",u:"lb",t:"num",w:"half"},{k:"HammerDrop_in",l:"Drop",u:"in",t:"num",w:"half"}];
+const CLOSE_F=[
+ {k:"HoleDepth",l:"Total depth",u:"ft",t:"num",req:1,w:"half"},{k:"DateCompleted",l:"Date completed",t:"date",w:"half"},
+ {k:"Termination",l:"Termination",t:"chips",o:L.Termination},
+ {k:"InOn",l:"In or on the bottom material",t:"chips",o:L.InOn,h:"Prints as e.g. Boring Terminated in RESIDUUM"},
+ {k:"Backfill",l:"Backfill",h:"Not exported"},{k:"Weather",l:"Weather",h:"Not exported"},{k:"Remarks",l:"Boring remarks",t:"area",h:"Not exported"}];
+const GW_F=[
+ {sec:"At completion (0 hr)"},
+ {k:"GW0Status",l:"Borehole",t:"chips",o:L.GW},{k:"GW0Depth",l:"Water depth",u:"ft",t:"num"},
+ {sec:"24 hour reading"},
+ {k:"GW24Status",l:"Borehole",t:"chips",o:L.GW},{k:"GW24Depth",l:"Water depth",u:"ft",t:"num"},
+ {k:"DateGW",l:"Date of reading",t:"date"},
+ {sec:"Cave-in"},
+ {k:"CaveDepth",l:"Cave-in depth",u:"ft",t:"num",h:"Depth the hole caved to"}];
+const REM_F=[{k:"Depth",l:"At depth",u:"ft",t:"num",req:1},{k:"Remark",l:"Note",t:"area",req:1,h:"Kept in the app; not part of the gINT export"}];
+
+/* gINT import layout copied from Import_format_example_for_gINT.xlsx:
+   sheet -> [field name (row 1), caption (row 2), units (row 3), number format, column width] */
+const GINT={"PROJECT":[["Client","'Client Name","'","General",12.14],["Number","Project Number","","General",14.86],["Name","Project Name","","General",12.86],["Location","Location","","General",8.57],["County","","","General",7.0],["LogScale","Boring Log Scale ","ft","General",15.86],["CoreLogScale","Coring Log Scale ","ft","General",0],["HALogScale","Hand Auger Log Scale","","General",20.0],["Units","","","General",5.57],["Water_Unit_Wt","","pcf","General",13.86],["Coeff_of_Consol_Factor","","","General",21.86],["Preliminary","","","0",11.14]],"POINT":[["PointID","'Boring ID","'","General",7.43],["HoleDepth","Total Depth ","ft","0.0",11.43],["East","","ft","0.00",10.57],["North","","ft","0.00",9.57],["Elevation","","ft","0.00",9.0],["LogScale","","ft","General",8.71],["ReferenceElev","","","0.00",13.14],["Type","","","General",5.0],["ElementElev","","ft","General",11.43],["FFE","","ft","0.00",4.0],["CollarElev","","ft","0.00",9.71],["Alignment","","","General",9.86],["Station","","","0",7.14],["Offset","","ft","0",6.14],["DateStarted","","M/d/yyyy h:mm:ss AM/PM","m/d/yyyy\\ h:mm:ss\\ AM/PM",11.14],["DateCompleted","","M/d/yyyy h:mm:ss AM/PM","m/d/yyyy\\ h:mm:ss\\ AM/PM",14.57],["Geologist","","","General",9.29],["Driller","","","General",6.43],["DrillMachine","","","General",12.29],["DrillMethod","","","General",11.29],["HammerType","","","General",12.57],["Termination","","","General",11.71],["In-On","","","General",6.0],["In/On","","","0",6.0],["Term_Origin","","","General",11.71],["CaveDepth","","ft","General",10.29],["GW_0hr","","ft","General",7.71],["GW_24hr","","ft","General",8.71],["Borehole0hr","","","General",11.71],["Borehole24hr","","","General",12.71],["DateGW","","M/d/yyyy h:mm:ss AM/PM","m/d/yyyy\\ h:mm:ss\\ AM/PM",8.0],["Suppress 0 hr GW","","","0",16.43],["SurfaceDescription","","","General",18.0],["Top_Log_Description","","","General",19.43],["Surface_Water_Depth","","ft","General",19.86],["Plunge","","","General",7.0],["Core_Size","","","General",9.29],["Total_Run","","","General",9.71]],"LITHOLOGY":[["PointID","'Boring ID","'","General",7.43],["Depth","","ft","0.0",6.14],["Bottom","","ft","General",7.29],["LayerLineType","Line Type","","General",13.29],["Origin","","","General",6.43],["Shade","Color Shade","","General",0],["ColorMod","Color Modifier","","General",9.57],["Color1","Primary Color","","General",6.71],["ColorConj","Join","","General",9.71],["Color2","Secondary Colors","","General",6.71],["ClassMod1","Modifiers","","General",10.71],["ClassMod2","Modifiers","","General",0],["Class","Soil Class.","","General",5.86],["Symbol","(Symbol)","","General",7.43],["Rock","Rock Class.","","General",5.29],["ClassCon","Conjunction","","General",9.29],["Remarks1","Remarks 1","","General",9.71],["Remarks2","Remarks 2","","General",0],["Remarks3","Remarks 3","","General",0],["Description","","","General",11.14],["Remarks4","Custom Remarks and Measurements","","General",9.71],["Graphic","","","General",8.0]],"SAMPLE":[["PointID","'Boring ID","'","General",7.43],["Depth","","ft","0.00",6.14],["Length","","ft","General",6.71],["Type","","","General",5.0],["Number","","","General",8.14],["Blows 1st","","","General",9.29],["Blows 2nd","","","General",10.0],["Blows 3rd","","","General",9.57],["Blows 4th","","","General",9.43],["N-Value","","","0",8.14],["BlowGraphLine","","","General",14.43],["BlowCountNote","","","General",14.71],["Moisture","","","General",8.71]]};
+
+/* GPS (WGS84) to NC State Plane NAD83 US survey feet, EPSG:2264 (Lambert conformal conic). */
+function llToNC(latDeg,lonDeg){
+  const r=Math.PI/180,a=6378137,f=1/298.257222101,e=Math.sqrt(2*f-f*f),ft=1200/3937;
+  const m=p=>Math.cos(p)/Math.sqrt(1-e*e*Math.sin(p)**2);
+  const t=p=>Math.tan(Math.PI/4-p/2)/Math.pow((1-e*Math.sin(p))/(1+e*Math.sin(p)),e/2);
+  const p1=(36+10/60)*r,p2=(34+20/60)*r,p0=33.75*r,p=latDeg*r;
+  const n=(Math.log(m(p1))-Math.log(m(p2)))/(Math.log(t(p1))-Math.log(t(p2)));
+  const F=m(p1)/(n*Math.pow(t(p1),n));
+  const rho=a*F*Math.pow(t(p),n),rho0=a*F*Math.pow(t(p0),n),th=n*(lonDeg+79)*r;
+  return {E:(609601.22+rho*Math.sin(th))/ft,N:(rho0-rho*Math.cos(th))/ft};
+}
+
+/* ---------- state & storage ---------- */
+const LS="geolog.v1";
+let S=null;
+function blank(){return{projects:{},borings:{}}}
+const NB=window.AndroidBridge||null;
+function loadLocal(){try{const r=NB?NB.loadData():localStorage.getItem(LS);if(r){const o=JSON.parse(r);if(o&&o.projects&&o.borings)return o}}catch(e){}return null}
+function saveLocal(){try{const t=JSON.stringify(S);if(NB)return NB.saveData(t);localStorage.setItem(LS,t);return true}catch(e){return false}}
+const uid=()=>Math.random().toString(36).slice(2,10)+Date.now().toString(36).slice(-4);
+const today=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")};
+const nowTime=()=>{const d=new Date();return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0")};
+const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const isNum=v=>typeof v==="number"&&isFinite(v);
+const fd=v=>isNum(v)?(Math.round(v*10)/10).toFixed(1):"–";
+
+function seedExample(){
+  const pid="example",bid="example-b1";
+  S.projects[pid]={id:pid,example:true,ProjectID:"EX-001",ProjectName:"Example – Riverside Commons",Client:"Example client",Location:"Pittsboro, NC",County:"Chatham",updated:1};
+  S.borings[bid]={id:bid,pid,PointID:"B-1",PointType:"SPT",DateStarted:"2026-10-27",DateCompleted:"2026-10-27",Latitude:35.71974,Longitude:-79.05868,GPS_Accuracy:9,Elevation:289.5,Easting:1982582.17,Northing:716886.92,
+    Alignment:"",Station:"",Offset:"",DrillingContractor:"Example Drilling",Driller:"Rascot, R.",LoggedBy:"Goodnight, D.",DrillRig:"CME 55 Truck",DrillMethod:"Hollow Augers",BoreholeDiam_in:8,HammerType:"Automatic",HammerWeight_lb:140,HammerDrop_in:30,HammerEfficiency_pct:82,
+    HoleDepth:10.3,Termination:"Auger Refusal",InOn:"on",GW0Status:"Dry",GW0Depth:"",GW24Status:"Dry",GW24Depth:"",DateGW:"2026-10-28",CaveDepth:7.5,Backfill:"",Weather:"Clear, 60F",Remarks:"",updated:1,v:2,
+    samples:[
+      {id:"s1",Depth:1,Bottom:2.5,SampleID:"S-1",SampleType:"SS",Blows1:5,Blows2:5,Blows3:9,Blows4:"",RefusalFt:"",Moisture:"Moist",DriveLength_in:18,Recovery_in:12,RQD_pct:"",LabTests:"MC",Remarks:""},
+      {id:"s2",Depth:3.5,Bottom:5,SampleID:"S-2",SampleType:"SS",Blows1:8,Blows2:7,Blows3:10,Blows4:"",RefusalFt:"",Moisture:"Moist",DriveLength_in:18,Recovery_in:14,RQD_pct:"",LabTests:"MC, -200",Remarks:""},
+      {id:"s3",Depth:6,Bottom:7.5,SampleID:"S-3",SampleType:"SS",Blows1:9,Blows2:11,Blows3:15,Blows4:"",RefusalFt:"",Moisture:"Moist",DriveLength_in:18,Recovery_in:16,RQD_pct:"",LabTests:"",Remarks:""},
+      {id:"s4",Depth:8.5,Bottom:9.8,SampleID:"S-4",SampleType:"SS",Blows1:12,Blows2:30,Blows3:"",Blows4:"",RefusalFt:0.3,Moisture:"",DriveLength_in:15.6,Recovery_in:10,RQD_pct:"",LabTests:"",Remarks:""}],
+    strata:[
+      {id:"l1",Depth:0,Bottom:0.2,USCS:"TOPSOIL",GroupName:"",Geology:"",Remarks4:"",LayerLineType:""},
+      {id:"l2",Depth:0.2,Bottom:5.5,USCS:"CL",GroupName:"Lean CLAY",Geology:"Residuum",Shade:"",ColorMod:"",Color1:"Brown",ColorConj:"and",Color2:"Tan",ClassMod1:"",ClassMod2:"Sandy",ClassCon:"trace",Remarks1:"Rock Fragments",Remarks2:"",Remarks3:"",Moisture:"Moist",Consistency:"Stiff",Density:"",LayerLineType:"1"},
+      {id:"l3",Depth:5.5,Bottom:9.5,USCS:"ML",GroupName:"SILT",Geology:"Residuum",Shade:"",ColorMod:"",Color1:"Tan",ColorConj:"and",Color2:"Brown",ClassMod1:"",ClassMod2:"Sandy",ClassCon:"",Remarks1:"",Moisture:"Moist",Consistency:"Very Stiff",Density:"",LayerLineType:""},
+      {id:"l4",Depth:9.5,Bottom:10.3,USCS:"",GroupName:"",Geology:"PWR",Rock:"Metavolcanic Rock",Color1:"Tan",Moisture:"",LayerLineType:""}],
+    water:[],
+    remarks:[{id:"r1",Depth:9,Remark:"Harder drilling 9–10 ft"}]};
+  S.borings[bid].strata.forEach(x=>{x.Description=describe(x);x.descEdited=false});
+}
+
+/* ---------- upgrade data saved by earlier versions ---------- */
+function migrate(){
+  Object.values(S.borings).forEach(b=>(b.strata||[]).forEach(x=>{if(x.Consistency){if(!x.Density)x.Density=x.Consistency;x.Consistency=""}}));
+  const COLOR_SPLIT=c=>{
+    const o={Shade:"",ColorMod:"",Color1:"",ColorConj:"",Color2:""};if(!c)return o;
+    let w=String(c).trim();
+    const sh=w.match(/^(Light|Dark)\s+/i);if(sh){o.Shade=sh[1][0].toUpperCase()+sh[1].slice(1).toLowerCase();w=w.slice(sh[0].length)}
+    const md=w.match(/^(Reddish|Yellowish|Grayish|Mottled)\s+/i);if(md){o.ColorMod=md[1][0].toUpperCase()+md[1].slice(1).toLowerCase();w=w.slice(md[0].length)}
+    o.Color1=w;return o;
+  };
+  Object.values(S.borings).forEach(b=>{
+    if(b.deleted||b.v>=2)return;
+    if(b.PointType==="Boring"||!b.PointType)b.PointType="SPT";
+    if(b.DrillMethod==="Hollow Stem Auger")b.DrillMethod="Hollow Augers";
+    (b.samples||[]).forEach(s=>{
+      if(isNum(s.RefusalIn)&&!isNum(s.RefusalFt))s.RefusalFt=Math.round(s.RefusalIn/12*10)/10;
+      delete s.RefusalIn;
+      if(s.Moisture==null){const L2=layerAt(b,s.Depth);s.Moisture=L2&&L2.Moisture||""}
+    });
+    (b.strata||[]).forEach(x=>{
+      if(x.Color!=null&&x.Color1==null){Object.assign(x,COLOR_SPLIT(x.Color));delete x.Color}
+      if(x.Modifiers&&x.Remarks1==null){x.Remarks1=x.Modifiers}
+      delete x.Modifiers;
+      if(x.USCS==="FILL"){x.USCS="";if(/^fill$/i.test(x.GroupName||""))x.GroupName="";if(!x.Geology)x.Geology="Artificial Fill"}
+      if(x.USCS==="ROCK"){x.USCS="";if(/^rock$/i.test(x.GroupName||""))x.GroupName=""}
+      if(x.Geology==="FILL")x.Geology="Artificial Fill";
+      if(!x.descEdited)x.Description=describe(x);
+    });
+    if(!b.GW0Status&&!b.GW24Status){
+      const ws=b.water||[];
+      const z=ws.find(w=>w.ReadingTiming==="At Completion")||ws.find(w=>w.ReadingTiming==="During Drilling");
+      const d=ws.find(w=>w.ReadingTiming==="24 hr"||w.ReadingTiming==="Later Reading");
+      if(z&&isNum(z.Depth)){b.GW0Status="Water";b.GW0Depth=z.Depth}
+      if(d&&isNum(d.Depth)){b.GW24Status="Water";b.GW24Depth=d.Depth;b.DateGW=d.Date||""}
+      const cv=ws.map(w=>w.CaveInDepth).filter(isNum);if(cv.length&&!isNum(b.CaveDepth))b.CaveDepth=Math.min(...cv);
+    }
+    if(!b.Termination)b.Termination="Boring Terminated";
+    if(!b.InOn)b.InOn="in";
+    b.v=2;
+  });
+}
+
+/* ---------- saving ---------- */
+function touch(kind,id){
+  const o=kind==="p"?S.projects[id]:S.borings[id]; if(o)o.updated=Date.now();
+  if(!saveLocal())toast("Couldn't save to the phone. Export or back up now.");
+}
+function syncPill(){return '<span class="pill" id="sync">Saved on phone</span>'}
+
+/* ---------- domain helpers ---------- */
+const projs=()=>Object.values(S.projects).filter(p=>!p.deleted).sort((a,b)=>(b.updated||0)-(a.updated||0));
+const bors=pid=>Object.values(S.borings).filter(b=>b.pid===pid&&!b.deleted).sort((a,b)=>String(a.PointID).localeCompare(String(b.PointID),undefined,{numeric:true}));
+const byDepth=a=>[...a].sort((x,y)=>(x.Depth||0)-(y.Depth||0));
+/* Blow counts. Full 6-inch increments are numbers; a refusal (50 blows in less than 6 in)
+   goes in the next slot as "50/0.3" (tenths of a foot), as in the gINT example. */
+const hasRef=s=>isNum(s.RefusalFt);
+function blowSlots(s){
+  const full=[s.Blows1,s.Blows2,s.Blows3,s.Blows4];
+  const out=[];for(const v of full){if(isNum(v))out.push(String(v));else break}
+  if(hasRef(s)&&out.length<4)out.push("50/"+fmtFt(s.RefusalFt));
+  while(out.length<4)out.push("");
+  return out;
+}
+const fmtFt=v=>String(Math.round(v*10)/10);
+function blowsText(s){return blowSlots(s).filter(Boolean).join("-")}
+function refText(s){return hasRef(s)?"50/"+fmtFt(s.RefusalFt):""}
+/* Penetration length in feet: 0.5 per full increment plus the refusal distance. */
+function penFt(s){
+  if(s.SampleType&&s.SampleType!=="SS")return isNum(s.Bottom)&&isNum(s.Depth)?Math.round((s.Bottom-s.Depth)*100)/100:"";
+  const n=blowSlots(s).filter(v=>v&&v.indexOf("/")<0).length;
+  if(!n&&!hasRef(s))return "";
+  return Math.round((n*0.5+(hasRef(s)?s.RefusalFt:0))*100)/100;
+}
+function nVal(s){if(hasRef(s))return"";return isNum(s.Blows2)&&isNum(s.Blows3)?s.Blows2+s.Blows3:""}
+/* What the log strip shows beside a sample: N, or the refusal text. */
+function nLabel(s){if(s.SampleType&&s.SampleType!=="SS")return"";const n=nVal(s);return n!==""?String(n):refText(s)}
+function recPct(s){return isNum(s.Recovery_in)&&isNum(s.DriveLength_in)&&s.DriveLength_in>0?Math.round(s.Recovery_in/s.DriveLength_in*100):""}
+function layerAt(b,d){return byDepth(b.strata||[]).find(x=>isNum(x.Depth)&&d>=x.Depth&&(!isNum(x.Bottom)||d<x.Bottom))||null}
+const isSurface=x=>!!SURFACE[x.USCS];
+const originText=g=>g?(ORIGIN_OUT[g]||String(g).toUpperCase()):"";
+function inches(x){return isNum(x.Depth)&&isNum(x.Bottom)?Math.floor((x.Bottom-x.Depth)*12+1e-6)+" inches":""}
+function colorText(x){
+  const c1=[x.Shade,x.ColorMod,x.Color1].filter(Boolean).join(" ");
+  if(!c1&&!x.Color2)return"";
+  if(x.Color2){const j=x.ColorConj==="-"?"-":" "+(x.ColorConj||"and")+" ";return (c1+j+x.Color2).toLowerCase()}
+  return c1.toLowerCase();
+}
+function classText(x){
+  const cls=(x.GroupName||NAMES[x.USCS]||"").toUpperCase();
+  const mods=[x.ClassMod1,x.ClassMod2].filter(Boolean).join(" ");
+  return [mods,cls].filter(Boolean).join(" ")+(x.USCS&&cls?" ("+x.USCS+")":"");
+}
+/* Log order: ORIGIN: color, moisture, consistency/density, modifiers, CLASSIFICATION, rock */
+function describe(x){
+  if(isSurface(x))return SURFACE[x.USCS].origin+(inches(x)?" ("+inches(x)+")":"");
+  const parts=[colorText(x),(x.Moisture||"").toLowerCase(),(x.Consistency||x.Density||"").toLowerCase()];
+  const mod=[x.ClassCon,x.Remarks1].filter(Boolean).join(" ");
+  parts.push(mod,x.Remarks2||"",x.Remarks3||"",classText(x),x.Rock||"");
+  let body=parts.filter(Boolean).join(", ");
+  if(body)body=body.charAt(0).toUpperCase()+body.slice(1);
+  const o=originText(x.Geology);
+  return o?(body?o+": "+body:o):body;
+}
+function fam(x){
+  const u=typeof x==="string"?x:(x.USCS||"");
+  if(typeof x==="object"&&!u){if(ROCKY.has(x.Geology))return"rock";if(FILLY.has(x.Geology))return"fill";return"none"}
+  if(!u)return"none";if(u==="ASPHALT"||u==="CONCRETE"||u==="ABC")return"pave";if(u==="TOPSOIL"||u[0]==="O"||u==="PT")return"org";if(u[0]==="G")return"grav";if(u[0]==="S")return"sand";if(u[0]==="M"||u==="CL-ML")return"silt";return"clay"}
+function suggestFromN(n,fine){
+  if(!isNum(n))return"";
+  if(fine)return n<2?"Very Soft":n<=4?"Soft":n<=8?"Medium Stiff":n<=15?"Stiff":n<=30?"Very Stiff":"Hard";
+  return n<=4?"Very Loose":n<=10?"Loose":n<=30?"Medium Dense":n<=50?"Dense":"Very Dense";
+}
+function maxDepth(b){
+  let m=isNum(b.HoleDepth)?b.HoleDepth:0;
+  (b.samples||[]).forEach(s=>{m=Math.max(m,isNum(s.Bottom)?s.Bottom:s.Depth||0)});
+  (b.strata||[]).forEach(s=>{m=Math.max(m,isNum(s.Bottom)?s.Bottom:s.Depth||0)});
+  return m;
+}
+function nextPointID(pid){
+  const ids=bors(pid).map(b=>String(b.PointID)); let max=0,pre="B-";
+  ids.forEach(id=>{const m=id.match(/^(.*?)(\d+)$/);if(m){const n=+m[2];if(n>=max){max=n;pre=m[1]}}});
+  return pre+(max+1);
+}
+
+/* ---------- form rendering ---------- */
+function F(f,v){
+  if(f.sec)return `<h3 class="sec">${esc(f.sec)}</h3>`;
+  if(f.gps)return `<div class="fld"><button type="button" class="btn blue full" data-act="gps" id="gpsbtn">Use phone GPS</button><small id="gpsmsg">Fills East/North (NC State Plane), latitude, longitude and accuracy. Stand at the boring.</small></div>`;
+  const id="f_"+f.k,lab=`<span class="lbl">${esc(f.l||f.k)}${f.u?` <i>${f.u}</i>`:""}${f.req?' <span class="req">required</span>':""}</span>`,hint=f.h?`<small>${f.h}</small>`:"",w=f.w||"";
+  if(f.t==="chips"||f.t==="multi"){
+    const vals=f.t==="multi"?String(v||"").split(", ").filter(Boolean):[v];
+    return `<div class="fld ${w}" id="w_${f.k}">${lab}<div class="chips ${f.cls||""}" data-k="${f.k}" data-multi="${f.t==="multi"?1:0}" role="group">${f.o.map(o=>`<button type="button" class="chip${vals.includes(o)?" on":""}" data-v="${esc(o)}" aria-pressed="${vals.includes(o)}">${esc(o)}</button>`).join("")}</div>${hint}</div>`;
+  }
+  if(f.t==="select")return `<label class="fld ${w}" for="${id}">${lab}<select id="${id}" data-k="${f.k}"><option value=""></option>${f.o.map(o=>`<option${o===v?" selected":""}>${esc(o)}</option>`).join("")}</select>${hint}</label>`;
+  if(f.t==="fill")return `<div class="fld ${w}" id="w_${f.k}"><label class="lbl" for="${id}">${esc(f.l||f.k)}</label><input id="${id}" data-k="${f.k}" type="text" autocomplete="off" value="${esc(v)}"><div class="chips quick">${f.o.map(o=>`<button type="button" class="qchip" data-act="fill" data-t="${id}" data-v="${esc(o)}">${esc(o)}</button>`).join("")}</div>${hint}</div>`;
+  if(f.t==="area")return `<label class="fld ${w}" for="${id}">${lab}<textarea id="${id}" data-k="${f.k}">${esc(v)}</textarea>${hint}</label>`;
+  if(f.t==="num")return `<label class="fld ${w}" for="${id}">${lab}<input id="${id}" class="num" data-k="${f.k}" data-num="1" type="text" inputmode="${f.neg?"text":"decimal"}" autocomplete="off" value="${esc(v)}">${hint}</label>`;
+  return `<label class="fld ${w}" for="${id}">${lab}<input id="${id}" data-k="${f.k}" type="${f.t||"text"}" ${f.list?`list="${f.list}"`:""} autocomplete="off" value="${esc(v)}">${hint}</label>`;
+}
+function form(specs,o){return `<div class="grid">${specs.map(f=>F(f,o[f.k]??"")).join("")}</div>`}
+function readForm(root){
+  const out={},bad=[];
+  root.querySelectorAll("[data-k]").forEach(el=>{
+    const k=el.dataset.k;
+    if(el.classList.contains("chips")){const on=[...el.querySelectorAll(".chip.on")].map(b=>b.dataset.v);out[k]=el.dataset.multi==="1"?on.join(", "):(on[0]||"")}
+    else if(el.dataset.num){const t=el.value.trim().replace(",",".");if(t===""){out[k]="";el.classList.remove("bad-in")}else{const n=Number(t);if(isFinite(n)){out[k]=n;el.classList.remove("bad-in")}else{out[k]="";bad.push(k);el.classList.add("bad-in")}}}
+    else out[k]=el.value.trim();
+  });
+  return {out,bad};
+}
+
+/* ---------- views ---------- */
+let view={name:"home"};
+const app=document.getElementById("app");
+function shell(title,back,body,bar){
+  return `<header class="top"><div class="wrap">${back?`<button class="back" data-act="${back.act}" ${back.data||""}>‹ ${esc(back.label)}</button>`:""}<div class="htitle">${esc(title)}</div>${syncPill()}</div></header><main class="wrap">${body}</main>${bar?`<div class="bar"><div class="wrap">${bar}</div></div>`:""}`;
+}
+function render(){
+  if(view.name==="project"&&!S.projects[view.pid])view={name:"home"};
+  if(view.name==="boring"&&!S.borings[view.bid])view={name:"home"};
+  app.innerHTML=view.name==="home"?vHome():view.name==="project"?vProject():vBoring();
+}
+function vHome(){
+  const ps=projs();
+  const rows=ps.map(p=>{const bs=bors(p.id);return `<button class="row" data-act="openP" data-id="${p.id}"><div class="main"><div class="t">${esc(p.ProjectName||"Untitled project")} ${p.example?'<span class="pill ex">Example</span>':""}</div><div class="s">${esc(p.ProjectID)} · ${bs.length} boring${bs.length===1?"":"s"}${p.Location?" · "+esc(p.Location):""}</div></div><span aria-hidden="true">›</span></button>`}).join("");
+  return shell("Falcon Logs",null,
+    `<div><h2>Projects</h2><p class="meta">Pick a project to log borings, or start a new one.</p></div>
+     <div class="list">${rows||'<div class="empty">No projects yet. Tap <b>New project</b> to start.</div>'}</div>
+     <p class="note">${NB?"Everything saves on this phone as you type and works with no signal. Uninstalling the app deletes its data, so back up now and then.":"Everything saves on this device as you type and works with no signal once installed. Deleting the app or clearing this site's data deletes your logs, so back up now and then."}</p>
+     ${installHint()}
+     <div class="actions"><button class="btn" data-act="backup">Back up all data</button><button class="btn" data-act="restore">Restore a backup</button></div>
+     <p class="credit">Created by Michael Daniels, PG</p>`,
+    `<button class="btn pri" data-act="newP">New project</button>`);
+}
+function vProject(){
+  const p=S.projects[view.pid],bs=bors(p.id);
+  const rows=bs.map(b=>{const md=maxDepth(b),done=isNum(b.HoleDepth);return `<button class="row" data-act="openB" data-id="${b.id}"><div class="depth">${esc(b.PointID)}<small>${fd(md)} ft</small></div><div class="main"><div class="t">${esc(b.PointType||"Boring")} · ${(b.samples||[]).length} samples · ${(b.strata||[]).length} layers</div><div class="s">${esc(b.DateStarted||"No date")}${b.LoggedBy?" · "+esc(b.LoggedBy):""}</div></div><span class="pill ${done?"ok":""}">${done?"Closed":"Open"}</span></button>`}).join("");
+  return shell(p.ProjectName||"Project",{act:"home",label:"Projects"},
+    `<div><h2>${esc(p.ProjectName||"Untitled project")}</h2><p class="meta">${esc(p.ProjectID)}${p.Client?" · "+esc(p.Client):""}${p.Location?" · "+esc(p.Location):""}${p.County?" · "+esc(p.County)+" County":""}</p>${p.example?'<p class="hint">This is example data so you can see how logging works. Delete it from <b>Project details</b> when you are done.</p>':""}</div>
+     <div class="actions"><button class="btn" data-act="editP">Project details</button><button class="btn blue" data-act="export">Export to Excel</button></div>
+     <h3>Borings</h3>
+     <div class="list">${rows||'<div class="empty">No borings yet. Tap <b>New boring</b> when the rig sets up.</div>'}</div>`,
+    `<button class="btn pri" data-act="newB">New boring ${esc(nextPointID(p.id))}</button>`);
+}
+function strip(b){
+  const md=Math.max(5,Math.ceil(maxDepth(b)/5)*5),pct=d=>Math.min(100,Math.max(0,d/md*100)),H=300;
+  const step=md>40?10:5; let ticks="";for(let d=0;d<=md;d+=step)ticks+=`<span style="top:${pct(d)}%">${d}</span>`;
+  const bands=byDepth(b.strata||[]).map(s=>{const bot=isNum(s.Bottom)?s.Bottom:s.Depth,f=fam(s);return `<i class="${f}" style="top:${pct(s.Depth)}%;height:${pct(bot)-pct(s.Depth)}%;background-color:var(--${f})" title="${esc(s.USCS||s.Geology||"")}"></i>`}).join("");
+  const ss=byDepth(b.samples||[]);
+  const samps=ss.map(s=>{const bot=isNum(s.Bottom)?s.Bottom:s.Depth+(isNum(penFt(s))?penFt(s):1.5);return `<b style="top:${pct(s.Depth)}%;height:${Math.max(1.5,pct(bot)-pct(s.Depth))}%"></b>`}).join("");
+  /* N labels at each sample's mid-depth; skip one that would overlap the label above it. */
+  let lastY=-99,labels="";
+  ss.forEach(s=>{const t=nLabel(s);if(!t)return;const bot=isNum(s.Bottom)?s.Bottom:s.Depth+1.5,y=pct((s.Depth+bot)/2)*H/100;
+    if(y-lastY<11)return;lastY=y;labels+=`<em class="${hasRef(s)?"ref":""}" style="top:${y}px">${esc(t)}</em>`});
+  const wd=b.GW0Status==="Water"&&isNum(b.GW0Depth)?b.GW0Depth:b.GW24Status==="Water"&&isNum(b.GW24Depth)?b.GW24Depth:null;
+  const w=wd!=null?`<span class="wl" style="top:${pct(wd)}%" title="Water ${wd} ft"></span>`:"";
+  return `<div class="strip" aria-label="Log strip to ${md} ft with N-values"><div class="ticks">${ticks}</div><div class="col">${bands}</div><div class="samps">${samps}${w}<span class="ncap">N</span>${labels}</div></div>`;
+}
+function vBoring(){
+  const b=S.borings[view.bid],p=S.projects[b.pid],tab=view.tab||"samples";
+  const ss=byDepth(b.samples||[]),st=byDepth(b.strata||[]),rr=byDepth(b.remarks||[]);
+  const gwTxt=(st0,d)=>st0==="Water"&&isNum(d)?fd(d)+" ft":st0==="Dry"?"Dry":"–";
+  const facts=`<div class="facts">
+    <div class="fact"><div class="k">Logged to</div><div class="v">${fd(maxDepth(b))} ft</div></div>
+    <div class="fact"><div class="k">Final depth</div><div class="v">${isNum(b.HoleDepth)?fd(b.HoleDepth)+" ft":"Open"}</div></div>
+    <div class="fact"><div class="k">Water 0 hr</div><div class="v">${gwTxt(b.GW0Status,b.GW0Depth)}</div></div>
+    <div class="fact"><div class="k">Water 24 hr</div><div class="v">${gwTxt(b.GW24Status,b.GW24Depth)}</div></div>
+    <div class="actions"><button class="btn" data-act="editB">Boring info</button><button class="btn" data-act="close">Close out</button></div></div>`;
+  const T=(k,l,n)=>`<button class="tab${tab===k?" on":""}" data-act="tab" data-t="${k}" role="tab" aria-selected="${tab===k}">${l}<em>${n}</em></button>`;
+  let list="",cta="";
+  if(tab==="samples"){
+    list=ss.map(s=>`<button class="row" data-act="editS" data-id="${s.id}"><div class="depth">${fd(s.Depth)}–${fd(s.Bottom)}<small>${esc(s.SampleID)} ${esc(s.SampleType)}</small></div><div class="main"><div class="t">${s.SampleType==="SS"?(esc(blowsText(s))||"No blows")+(nVal(s)!==""?` · N=${nVal(s)}`:hasRef(s)?" · refusal":""):esc(s.SampleType)}</div><div class="s">${[s.Moisture,isNum(penFt(s))?"Length "+penFt(s)+" ft":"",isNum(s.Recovery_in)?`Rec ${s.Recovery_in} in`:"",s.LabTests].filter(Boolean).map(esc).join(" · ")||"&nbsp;"}</div></div></button>`).join("");
+    const last=ss[ss.length-1],nd=last?Math.round((last.Depth+2.5)*10)/10:1;
+    cta=`<button class="btn pri" data-act="newS">Add sample at ${fd(nd)} ft</button>`;
+  }else if(tab==="strata"){
+    list=st.map(s=>`<button class="row" data-act="editL" data-id="${s.id}"><span class="sw" style="background:var(--${fam(s)})"></span><div class="depth">${fd(s.Depth)}–${fd(s.Bottom)}<small>${esc(s.USCS||(ROCKY.has(s.Geology)?s.Geology:""))}</small></div><div class="main"><div class="s" style="color:var(--ink)">${esc(s.Description||describe(s))}</div></div></button>`).join("");
+    const last=st[st.length-1];cta=`<button class="btn pri" data-act="newL">Add layer from ${fd(last&&isNum(last.Bottom)?last.Bottom:0)} ft</button>`;
+  }else if(tab==="water"){
+    const row=(lab,st0,d,extra)=>`<button class="row" data-act="editGW"><div class="depth">${lab}</div><div class="main"><div class="t">${gwTxt(st0,d)==="–"?"Not entered":gwTxt(st0,d)==="Dry"?"Dry":"Water at "+gwTxt(st0,d)}</div><div class="s">${extra||"&nbsp;"}</div></div></button>`;
+    list=row("0 hr",b.GW0Status,b.GW0Depth,"At completion")+row("24 hr",b.GW24Status,b.GW24Depth,b.DateGW?esc(b.DateGW):"No date")+
+      `<button class="row" data-act="editGW"><div class="depth">Cave-in</div><div class="main"><div class="t">${isNum(b.CaveDepth)?fd(b.CaveDepth)+" ft":"Not entered"}</div></div></button>`;
+    cta=`<button class="btn pri" data-act="editGW">Enter groundwater</button>`;
+  }else{
+    list=rr.map(x=>`<button class="row" data-act="editR" data-id="${x.id}"><div class="depth">${fd(x.Depth)} ft</div><div class="main"><div class="s" style="color:var(--ink)">${esc(x.Remark)}</div></div></button>`).join("");
+    cta=`<button class="btn pri" data-act="newR">Add drilling note</button>`;
+  }
+  const emptyMsg={samples:"No samples yet.",strata:"No layers described yet.",water:"No water readings. Add one if you hit water or at completion.",notes:"No drilling notes."}[tab];
+  return shell(b.PointID,{act:"openP",label:p?(p.ProjectID||"Project"):"Project",data:`data-id="${b.pid}"`},
+    `<div><h2>${esc(b.PointID)}</h2><p class="meta">${esc(b.DrillMethod||"Method not set")} · ${esc(b.DateStarted||"No date")}${b.LoggedBy?" · Logged by "+esc(b.LoggedBy):""}</p></div>
+     <div class="summary">${strip(b)}${facts}</div>
+     <div class="tabs" role="tablist">${T("samples","Samples",ss.length)}${T("strata","Strata",st.length)}${T("water","Water",[b.GW0Status,b.GW24Status].filter(Boolean).length)}${T("notes","Notes",rr.length)}</div>
+     <div class="list">${list||`<div class="empty">${emptyMsg}</div>`}</div>`,cta);
+}
+
+/* ---------- sheets ---------- */
+const sheet=document.getElementById("sheet"),panel=document.getElementById("panel");
+let cur=null; // {type, save, del}
+function openSheet(title,body,opts){
+  cur=opts||{};
+  panel.innerHTML=`<div class="grab"></div><div class="phead"><h2>${esc(title)}</h2><button class="btn ghost" data-act="cancel">Cancel</button></div><form id="frm" novalidate>${body}<p class="err" id="err" hidden></p><div class="actions" style="margin-top:18px">${opts&&opts.del?'<button type="button" class="btn danger" data-act="del">Delete</button>':""}${opts&&opts.save?`<button type="submit" class="btn pri">${esc(opts.saveLabel||"Save")}</button>`:""}</div></form>`;
+  sheet.hidden=false; panel.scrollTop=0;
+  if(cur.onInput)cur.onInput();
+  const first=panel.querySelector("input,select,textarea"); if(first&&opts&&opts.focus)setTimeout(()=>first.focus(),60);
+}
+function closeSheet(){sheet.hidden=true;panel.innerHTML="";cur=null}
+function err(msg){const e=document.getElementById("err");if(e){e.textContent=msg;e.hidden=!msg;if(msg)e.scrollIntoView({block:"nearest"})}}
+function confirmSheet(title,msg,okLabel,fn){
+  openSheet(title,`<p>${msg}</p>`,{save:fn,saveLabel:okLabel});
+  panel.querySelector('button[type="submit"]').classList.replace("pri","danger");
+}
+
+function projectSheet(p){
+  const isNew=!p; p=p||{};
+  openSheet(isNew?"New project":"Project details",form(PROJ_F,p),{focus:isNew,save(){
+    const {out,bad}=readForm(panel); if(!out.ProjectID||!out.ProjectName)return err("Enter a project number and name.");
+    const id=isNew?uid():p.id; S.projects[id]=Object.assign(S.projects[id]||{id},out,{id,touched:true});
+    touch("p",id); closeSheet(); view={name:"project",pid:id}; render(); toast(isNew?"Project created":"Project saved");
+  },del:isNew?null:()=>confirmSheet("Delete project?",`This removes <b>${esc(p.ProjectName)}</b> and its ${bors(p.id).length} boring(s) from this phone and your backup. Export first if you need the data.`,"Delete project",()=>{
+    bors(p.id).forEach(b=>{S.borings[b.id]={id:b.id,pid:b.pid,deleted:true};touch("b",b.id)});
+    S.projects[p.id]={id:p.id,deleted:true,example:p.example}; touch("p",p.id); if(p.example){delete S.projects[p.id]}
+    saveLocal(); closeSheet(); view={name:"home"}; render(); toast("Project deleted");
+  })});
+}
+function boringSheet(b){
+  const isNew=!b,pid=isNew?view.pid:b.pid;
+  if(isNew){
+    const prev=bors(pid).sort((x,y)=>(y.updated||0)-(x.updated||0))[0]||{};
+    const keep=["DrillingContractor","Driller","LoggedBy","DrillRig","DrillMethod","BoreholeDiam_in","HammerType","HammerWeight_lb","HammerDrop_in","HammerEfficiency_pct","Alignment","PointType"];
+    b={PointID:nextPointID(pid),PointType:"SPT",DateStarted:today(),DrillMethod:"Hollow Augers",HammerType:"Automatic",HammerWeight_lb:140,HammerDrop_in:30};
+    keep.forEach(k=>{if(prev[k]!==undefined&&prev[k]!=="")b[k]=prev[k]});
+  }
+  openSheet(isNew?"New boring":"Boring info",(isNew?'<p class="hint">Crew, rig and hammer are copied from your last boring in this project. Check them before you start.</p>':"")+form(BOR_F,b),{save(){
+    const {out,bad}=readForm(panel); if(bad.length)return err("Fix the highlighted numbers.");
+    if(!out.PointID)return err("Enter a boring ID.");
+    if(bors(pid).some(x=>x.PointID.toLowerCase()===out.PointID.toLowerCase()&&x.id!==b.id))return err(`${out.PointID} already exists in this project.`);
+    if(out.DateCompleted&&out.DateStarted&&out.DateCompleted<out.DateStarted)return err("Date completed is before date started.");
+    const id=isNew?uid():b.id;
+    S.borings[id]=Object.assign(isNew?{id,pid,v:2,samples:[],strata:[],water:[],remarks:[],HoleDepth:"",Termination:"Boring Terminated",InOn:"in"}:S.borings[id],out);
+    touch("b",id); closeSheet(); view={name:"boring",bid:id,tab:"samples"}; render(); toast(isNew?`${out.PointID} started`:"Boring saved");
+  },del:isNew?null:()=>confirmSheet(`Delete ${esc(b.PointID)}?`,"This removes the boring with all its samples, layers and readings.","Delete boring",()=>{
+    S.borings[b.id]={id:b.id,pid:b.pid,deleted:true}; touch("b",b.id); closeSheet(); view={name:"project",pid}; render(); toast("Boring deleted");
+  })});
+}
+function closeoutSheet(b){
+  const st=byDepth(b.strata||[]),lastL=st[st.length-1];
+  const v={HoleDepth:isNum(b.HoleDepth)?b.HoleDepth:(maxDepth(b)||""),DateCompleted:b.DateCompleted||today(),Termination:b.Termination||"Boring Terminated",InOn:b.InOn||"in",Backfill:b.Backfill,Weather:b.Weather,Remarks:b.Remarks};
+  const tOrigin=lastL?termOrigin(b):"";
+  openSheet(`Close out ${b.PointID}`,'<p class="hint">Total depth defaults to the deepest sample or layer logged.'+(tOrigin?` Bottom material: <b>${esc(tOrigin)}</b>.`:"")+'</p>'+form(CLOSE_F,v),{saveLabel:"Close boring",save(){
+    const {out,bad}=readForm(panel); if(bad.length||!isNum(out.HoleDepth))return err("Enter the total depth as a number.");
+    if(out.HoleDepth<maxDepth(b)-0.001)return err(`Total depth is shallower than the deepest entry (${fd(maxDepth(b))} ft).`);
+    Object.assign(b,out); touch("b",b.id); closeSheet(); render(); toast(`${b.PointID} closed at ${fd(out.HoleDepth)} ft`);
+  }});
+}
+function gwSheet(b){
+  const v={GW0Status:b.GW0Status||"",GW0Depth:b.GW0Depth,GW24Status:b.GW24Status||"",GW24Depth:b.GW24Depth,DateGW:b.DateGW||"",CaveDepth:b.CaveDepth};
+  openSheet(`Groundwater ${b.PointID}`,form(GW_F,v),{onInput(){
+    const {out}=readForm(panel);
+    document.getElementById("f_GW0Depth").closest(".fld").hidden=out.GW0Status!=="Water";
+    document.getElementById("f_GW24Depth").closest(".fld").hidden=out.GW24Status!=="Water";
+  },save(){
+    const {out,bad}=readForm(panel); if(bad.length)return err("Fix the highlighted numbers.");
+    if(out.GW0Status==="Water"&&!isNum(out.GW0Depth))return err("Enter the 0-hr water depth, or pick Dry.");
+    if(out.GW24Status==="Water"&&!isNum(out.GW24Depth))return err("Enter the 24-hr water depth, or pick Dry.");
+    if(out.GW0Status!=="Water")out.GW0Depth="";
+    if(out.GW24Status!=="Water")out.GW24Depth="";
+    if(out.GW24Status&&out.GW24Status!=="Not checked"&&!out.DateGW)out.DateGW=today();
+    Object.assign(b,out); touch("b",b.id); closeSheet(); render(); toast("Groundwater saved");
+  }});
+}
+function sampleSheet(b,s){
+  const isNew=!s,ss=byDepth(b.samples||[]),last=ss[ss.length-1];
+  if(isNew){
+    const d=last?Math.round((last.Depth+2.5)*10)/10:1;
+    const lay=layerAt(b,d);
+    s={Depth:d,Bottom:"",SampleID:"S-"+(ss.length+1),SampleType:last?last.SampleType:"SS",Blows1:"",Blows2:"",Blows3:"",Blows4:"",RefusalFt:"",Moisture:(lay&&lay.Moisture)||(last&&last.Moisture)||"Moist"};
+  }
+  const stp=(k,cap)=>`<div class="stepper"><span class="cap">${cap}</span><input class="num" id="f_${k}" data-k="${k}" data-num="1" inputmode="numeric" type="text" value="${esc(s[k])}" aria-label="Blows ${cap}"><div class="pm"><button type="button" data-act="step" data-t="${k}" data-d="-1" aria-label="Minus one">−</button><button type="button" data-act="step" data-t="${k}" data-d="1" aria-label="Plus one">+</button></div></div>`;
+  const body=`<div class="grid">
+    ${F({k:"Depth",l:"Top depth",u:"ft",t:"num",req:1,w:"half"},s.Depth)}${F({k:"SampleID",l:"Number",w:"half"},s.SampleID)}
+    ${F({k:"SampleType",l:"Type",t:"chips",o:L.SampleType,h:"SS split spoon · ST Shelby tube · CS core · GB grab · AU auger"},s.SampleType)}
+    <div class="fld" id="w_Bottom">${F({k:"Bottom",l:"Bottom depth",u:"ft",t:"num"},s.Bottom)}</div>
+    </div>
+    <div id="blk_blows"><h3 class="sec">Blows per 6 inches</h3>
+      <div class="blows">${stp("Blows1","1st 6″")}${stp("Blows2","2nd 6″")}${stp("Blows3","3rd 6″")}${stp("Blows4","4th 6″")}</div>
+      <div class="grid" style="margin-top:12px">${F({k:"RefusalFt",l:"Refusal: 50 blows in",u:"ft",t:"num",h:"Tenths of a foot, e.g. 0.3. Logged as 50/0.3 in the next increment. Leave blank if no refusal."},s.RefusalFt)}</div>
+    </div>
+    <div class="calc" id="calc" style="margin-top:12px"></div>
+    <div class="grid" style="margin-top:12px">
+    ${F({k:"Moisture",l:"Moisture",t:"chips",o:L.Moisture},s.Moisture)}
+    </div>
+    <h3 class="sec">Not exported</h3>
+    <div class="grid">
+    ${F({k:"Recovery_in",l:"Recovery",u:"in",t:"num",w:"half"},s.Recovery_in)}<div class="fld half" id="w_rqd">${F({k:"RQD_pct",l:"RQD",u:"%",t:"num"},s.RQD_pct)}</div>
+    ${F({k:"LabTests",l:"Lab tests requested",t:"multi",o:LAB},s.LabTests)}
+    ${F({k:"Remarks",l:"Remarks"},s.Remarks)}</div>`;
+  openSheet(isNew?`Sample at ${fd(s.Depth)} ft`:`Sample ${s.SampleID||fd(s.Depth)+" ft"}`,body,{onInput(){
+    const {out}=readForm(panel); const isSS=out.SampleType==="SS"||out.SampleType==="";
+    document.getElementById("blk_blows").hidden=!isSS; document.getElementById("w_Bottom").hidden=isSS; document.getElementById("w_rqd").hidden=!CORE.has(out.SampleType);
+    if(isSS){
+      const n=nVal(out),len=penFt(Object.assign({},out,{SampleType:"SS"}));
+      document.getElementById("calc").innerHTML=`<span>Blows <b>${esc(blowsText(out))||"–"}</b></span><span>N <b>${n===""?(hasRef(out)?"REF":"–"):n}</b></span><span>Length <b>${len===""?"–":len+" ft"}</b></span>`;
+    }else document.getElementById("calc").innerHTML="";
+  },save(){
+    const {out,bad}=readForm(panel); if(bad.length)return err("Fix the highlighted numbers.");
+    if(!isNum(out.Depth))return err("Enter the top depth.");
+    const isSS=out.SampleType==="SS"||out.SampleType==="";
+    if(isSS){
+      if(isNum(out.RefusalFt)&&(out.RefusalFt<=0||out.RefusalFt>=0.5))return err("Refusal distance must be between 0 and 0.5 ft.");
+      const full=[out.Blows1,out.Blows2,out.Blows3,out.Blows4];
+      const firstGap=full.findIndex(v=>!isNum(v));
+      if(firstGap>=0&&full.slice(firstGap).some(isNum))return err("Fill the blow counts in order, with no gaps.");
+      if(isNum(out.RefusalFt)&&full.every(isNum))return err("All four increments are full, so there's no room for a refusal. Clear one or the refusal.");
+      const len=penFt(Object.assign({},out,{SampleType:"SS"}));
+      out.Bottom=isNum(len)?Math.round((out.Depth+len)*100)/100:Math.round((out.Depth+1.5)*100)/100;
+      out.DriveLength_in=isNum(len)?Math.round(len*12*10)/10:18;
+    }else{
+      if(!isNum(out.Bottom)||out.Bottom<=out.Depth)return err("Enter a bottom depth deeper than the top.");
+      out.Blows1=out.Blows2=out.Blows3=out.Blows4=out.RefusalFt="";
+    }
+    const clash=(b.samples||[]).find(x=>x.id!==s.id&&out.Depth<x.Bottom&&out.Bottom>x.Depth); if(clash)return err(`Overlaps ${clash.SampleID||"the sample"} at ${fd(clash.Depth)} ft.`);
+    if(isNew)b.samples.push(Object.assign({id:uid()},out)); else Object.assign(s,out);
+    touch("b",b.id); closeSheet(); render(); toast(`${out.SampleID||"Sample"} saved`);
+  },del:isNew?null:()=>{b.samples=b.samples.filter(x=>x.id!==s.id);touch("b",b.id);closeSheet();render();toast("Sample deleted")}});
+}
+function strataSheet(b,s){
+  const isNew=!s,st=byDepth(b.strata||[]),last=st[st.length-1];
+  if(isNew){
+    const top=last&&isNum(last.Bottom)?last.Bottom:0;
+    const prev=last&&!isSurface(last)?last:null;
+    s={Depth:top,Bottom:"",USCS:"",GroupName:"",Geology:prev?prev.Geology:"",Shade:"",ColorMod:"",Color1:prev?prev.Color1:"",ColorConj:"",Color2:"",
+       ClassMod1:"",ClassMod2:"",ClassCon:"",Remarks1:"",Remarks2:"",Remarks3:"",Rock:"",Remarks4:"",LayerLineType:"",
+       Moisture:prev?prev.Moisture:"",Consistency:"",Density:"",Description:"",descEdited:false};
+  }
+  let edited=!!s.descEdited;
+  const lt=s.LayerLineType==="1"?"1":"Blank";
+  const body=`<div class="grid">
+    ${F({k:"Depth",l:"Top",u:"ft",t:"num",req:1,w:"half"},s.Depth)}${F({k:"Bottom",l:"Bottom",u:"ft",t:"num",req:1,w:"half"},s.Bottom)}
+    ${F({k:"Geology",l:"Origin",t:"chips",o:ORIGIN,h:"PWR partially weathered rock · WR weathered rock · NCR non-crystalline rock · CR crystalline rock. Exported only where it changes from the layer above."},isOtherOrigin(s.Geology)?"Other":s.Geology)}
+    <div class="fld" id="w_OriginOther">${F({k:"OriginOther",l:"Other origin",h:"e.g. Coastal Plain, Colluvium"},isOtherOrigin(s.Geology)&&s.Geology!=="Other"?s.Geology:"")}</div>
+    ${F({k:"USCS",l:"Symbol",t:"chips",o:L.USCS,cls:"uscs",h:"TOPSOIL, ABC (gravel base), ASPHALT and CONCRETE log as surface layers with their thickness in inches."},s.USCS)}
+    <div class="fld" id="blk_soil"><div class="grid">
+    ${F({k:"Shade",l:"Shade",t:"chips",o:L.Shade,w:"half"},s.Shade)}${F({k:"ColorMod",l:"Color modifier",t:"chips",o:L.ColorMod,w:"half"},s.ColorMod)}
+    ${F({k:"Color1",l:"Primary color",t:"chips",o:L.Color},s.Color1)}
+    ${F({k:"ColorConj",l:"Join",t:"chips",o:L.ColorConj},s.ColorConj)}
+    ${F({k:"Color2",l:"Secondary color",t:"chips",o:L.Color},s.Color2)}
+    ${F({k:"Moisture",l:"Moisture",t:"chips",o:L.Moisture,h:"For the description only. Sample moisture is exported from each sample."},s.Moisture)}
+    <div class="fld" id="nhint" hidden></div>
+    ${F({k:"Density",l:"Density",t:"chips",o:[...L.Consistency,...L.Density],h:"Very soft to hard for fine-grained soils · very loose to very dense for coarse-grained soils"},s.Density||s.Consistency)}
+    ${F({k:"ClassCon",l:"Conjunction",t:"chips",o:L.ClassCon,w:"half"},s.ClassCon)}
+    ${F({k:"Remarks1",l:"Remarks 1",t:"fill",o:L.Remarks1},s.Remarks1)}
+    ${F({k:"Remarks2",l:"Remarks 2",w:"half"},s.Remarks2)}${F({k:"Remarks3",l:"Remarks 3",w:"half"},s.Remarks3)}
+    ${F({k:"ClassMod1",l:"Modifier 1",t:"chips",o:L.ClassMod,w:"half"},s.ClassMod1)}${F({k:"ClassMod2",l:"Modifier 2",t:"chips",o:L.ClassMod,w:"half"},s.ClassMod2)}
+    ${F({k:"GroupName",l:"Soil class",h:"Filled from the symbol, e.g. LEAN CLAY. Modifiers go in front: Sandy LEAN CLAY (CL)."},s.GroupName)}
+    <div class="fld" id="w_rockblk">${F({k:"Rock",l:"Rock class",t:"fill",o:L.Rock},s.Rock)}</div>
+    <div class="fld" id="w_gl">${F({k:"GraphLine100",l:"Step the blow-count graph to 100 at the top of this layer",t:"chips",o:["Yes","No"]},s.GraphLine100||"Yes")}</div>
+    </div></div>
+    ${F({k:"Remarks4",l:"Custom remarks and measurements",h:"Surface layers fill this with their thickness, e.g. 2 inches."},s.Remarks4)}
+    ${F({k:"LayerLineType",l:"Line type at bottom of layer",t:"chips",o:L.LineType,h:"Blank or 1, matching your gINT library's line types."},lt)}
+    <label class="fld" for="f_Description"><span class="lbl">Log description <i id="dmode"></i></span><textarea id="f_Description" data-k="Description">${esc(s.Description)}</textarea><small>Shown in the app; gINT builds its own from the fields above. <button type="button" class="btn ghost" style="min-height:32px;padding:0" data-act="resetDesc">Rebuild</button></small></label>
+  </div>`;
+  let lastUSCS=s.USCS;
+  openSheet(isNew?`Layer from ${fd(s.Depth)} ft`:`Layer ${fd(s.Depth)}–${fd(s.Bottom)} ft`,body,{onInput(e){
+    const {out}=readForm(panel);
+    document.getElementById("w_OriginOther").hidden=out.Geology!=="Other";
+    readOrigin(out);
+    if(e&&e.target&&e.target.id==="f_Description")edited=true;
+    if(out.USCS!==lastUSCS){const gn=document.getElementById("f_GroupName");const oldN=(NAMES[lastUSCS]||"").toUpperCase();if(gn&&(!gn.value||gn.value.toUpperCase()===oldN))gn.value=(NAMES[out.USCS]||"").toUpperCase();lastUSCS=out.USCS;out.GroupName=gn?gn.value:""}
+    const surf=isSurface(out);
+    document.getElementById("blk_soil").hidden=surf;
+    document.getElementById("w_Geology").hidden=surf;
+    document.getElementById("w_rockblk").hidden=!ROCKY.has(out.Geology);
+    document.getElementById("w_gl").hidden=!(out.Geology==="PWR"||out.Geology==="WR");
+    const fine=FINE.has(out.USCS);
+    const inLayer=(b.samples||[]).filter(x=>isNum(out.Depth)&&x.Depth>=out.Depth&&(!isNum(out.Bottom)||x.Depth<out.Bottom)&&nVal(x)!=="");
+    const nh=document.getElementById("nhint");
+    if(inLayer.length&&out.USCS&&!surf){const ns=inLayer.map(nVal),min=Math.min(...ns),max=Math.max(...ns);nh.hidden=false;nh.innerHTML=`<div class="hint">N in this layer: <b>${min===max?min:min+"–"+max}</b> → typically <b>${esc(suggestFromN(min,fine))}${min!==max?" to "+esc(suggestFromN(max,fine)).toLowerCase():""}</b> (uncorrected N)</div>`}else nh.hidden=true;
+    const d=document.getElementById("f_Description");
+    if(!edited&&d)d.value=describe(out);
+    document.getElementById("dmode").textContent=edited?"edited by you":"auto";
+  },save(){
+    const {out,bad}=readForm(panel); if(bad.length)return err("Fix the highlighted numbers.");
+    readOrigin(out);
+    out.LayerLineType=out.LayerLineType==="1"?"1":"";
+    if(!isNum(out.Depth)||!isNum(out.Bottom))return err("Enter top and bottom depth.");
+    if(out.Bottom<=out.Depth)return err("Bottom must be deeper than top.");
+    if(isSurface(out)){["Shade","ColorMod","Color1","ColorConj","Color2","ClassMod1","ClassMod2","ClassCon","Remarks1","Remarks2","Remarks3","Rock","Moisture","Density","Geology"].forEach(k=>out[k]="");out.GroupName="";if(!out.Remarks4)out.Remarks4=inches(out)}
+    else if(!out.USCS&&!out.GroupName&&!ROCKY.has(out.Geology))return err("Pick a symbol, or an origin of PWR, WR, NCR or CR for rock.");
+    if(!ROCKY.has(out.Geology))out.Rock="";
+    const clash=(b.strata||[]).find(x=>x.id!==s.id&&out.Depth<x.Bottom&&out.Bottom>x.Depth); if(clash)return err(`Overlaps the layer at ${fd(clash.Depth)}–${fd(clash.Bottom)} ft.`);
+    out.Consistency="";
+    out.descEdited=edited; if(!out.Description)out.Description=describe(out);
+    if(isNew)b.strata.push(Object.assign({id:uid()},out)); else Object.assign(s,out);
+    touch("b",b.id); closeSheet(); render(); toast("Layer saved");
+  },del:isNew?null:()=>{b.strata=b.strata.filter(x=>x.id!==s.id);touch("b",b.id);closeSheet();render();toast("Layer deleted")}});
+  window._resetDesc=()=>{edited=false;cur.onInput()};
+}
+function simpleSheet(b,arr,specs,item,title,defs,label){
+  const isNew=!item; item=item||defs;
+  openSheet(title,form(specs,item),{focus:isNew,save(){
+    const {out,bad}=readForm(panel); if(bad.length)return err("Fix the highlighted numbers.");
+    const miss=specs.find(f=>f.req&&(out[f.k]===""||out[f.k]==null)); if(miss)return err(`Enter ${miss.l.toLowerCase()}.`);
+    if(isNew)b[arr].push(Object.assign({id:uid()},out)); else Object.assign(item,out);
+    touch("b",b.id); closeSheet(); render(); toast(label+" saved");
+  },del:isNew?null:()=>{b[arr]=b[arr].filter(x=>x.id!==item.id);touch("b",b.id);closeSheet();render();toast(label+" deleted")}});
+}
+
+/* ---------- validation & export ---------- */
+function validate(pid){
+  const E=[],W=[],bs=bors(pid),seen={};
+  bs.forEach(b=>{
+    const id=b.PointID||"(no ID)";
+    if(!b.PointID)E.push("A boring has no ID.");
+    const k=String(b.PointID).toLowerCase(); if(seen[k])E.push(`Boring ID ${id} is used twice.`); seen[k]=1;
+    if(!isNum(b.HoleDepth))W.push(`${id}: not closed out (no final depth).`);
+    else if(b.HoleDepth<maxDepth(b))W.push(`${id}: final depth is shallower than logged entries.`);
+    if(!isNum(b.Easting)||!isNum(b.Northing))W.push(`${id}: no East/North coordinates.`);
+    if(!b.GW0Status)W.push(`${id}: no 0-hr groundwater entered.`);
+    const st=byDepth(b.strata||[]);
+    if(!st.length)W.push(`${id}: no soil layers described.`);
+    else{ if(st[0].Depth>0)W.push(`${id}: layers start at ${fd(st[0].Depth)} ft, not 0.`);
+      for(let i=1;i<st.length;i++)if(Math.abs(st[i].Depth-st[i-1].Bottom)>0.01)W.push(`${id}: gap or overlap at ${fd(st[i-1].Bottom)} ft.`);
+      if(isNum(b.HoleDepth)&&Math.abs(st[st.length-1].Bottom-b.HoleDepth)>0.01)W.push(`${id}: last layer ends at ${fd(st[st.length-1].Bottom)} ft but hole is ${fd(b.HoleDepth)} ft.`);}
+    (b.samples||[]).forEach(s=>{if(s.SampleType==="SS"&&!blowsText(s))W.push(`${id} at ${fd(s.Depth)} ft: split spoon with no blow counts.`)});
+  });
+  if(!bs.length)E.push("This project has no borings to export.");
+  return {E,W};
+}
+function exportSheet(){
+  const p=S.projects[view.pid],{E,W}=validate(p.id);
+  const li=(a,c)=>a.map(x=>`<li class="${c}">${esc(x)}</li>`).join("");
+  openSheet("Export to Excel",`<p class="meta">One workbook for all ${bors(p.id).length} boring(s) in ${esc(p.ProjectID)}, in your gINT import layout: PROJECT, POINT, LITHOLOGY and SAMPLE.</p>
+    ${E.length||W.length?`<h3 class="sec">${E.length?"Fix before export":"Check before export"}</h3><ul class="issues">${li(E,"e")}${li(W,"")}</ul>`:'<p class="hint">All checks passed.</p>'}`,
+    E.length?{}:{saveLabel:W.length?"Export anyway":"Export workbook",save:()=>doExport(p)});
+}
+const num=v=>isNum(v)?v:null, dte=v=>{if(!v)return null;const m=String(v).match(/^(\d{4})-(\d\d)-(\d\d)$/);return m?new Date(+m[1],+m[2]-1,+m[3]):v};
+/* Effective origin of each layer (blank layers continue the one above). */
+function effOrigins(b){
+  let cur="";return byDepth(b.strata||[]).map(x=>{
+    if(isSurface(x))cur=SURFACE[x.USCS].origin;else if(x.Geology)cur=originText(x.Geology);
+    return {x,origin:cur,raw:isSurface(x)?"":x.Geology};
+  });
+}
+function termOrigin(b){const e=effOrigins(b);return e.length?e[e.length-1].origin:""}
+function graphicFor(x,rawOrigin){
+  if(isSurface(x))return SURFACE[x.USCS].graphic;
+  if(rawOrigin==="PWR"||rawOrigin==="WR")return "WR";
+  /* No confirmed gINT graphic for these yet, so leave the cell blank. */
+  if(rawOrigin==="NCR"||rawOrigin==="CR"||rawOrigin==="Roadway Embankment")return "";
+  if(rawOrigin==="Artificial Fill")return x.USCS?"FILL "+x.USCS:"FILL";
+  return x.USCS||"";
+}
+/* Row objects keyed by the gINT field names; anything missing exports as an empty cell. */
+function buildSheets(p){
+  const bs=bors(p.id),txt=v=>v==null||v===""?"":{t:String(v)};
+  const project=[{Client:txt(p.Client),Number:txt(p.ProjectID),Name:txt(p.ProjectName),Location:txt(p.Location),County:txt(p.County),
+    HALogScale:1,Water_Unit_Wt:62.42769,Preliminary:-1}];
+  const point=bs.map(b=>({
+    PointID:txt(b.PointID),HoleDepth:num(b.HoleDepth),East:num(b.Easting),North:num(b.Northing),Elevation:num(b.Elevation),
+    Type:txt(b.PointType),Alignment:txt(b.Alignment),Station:num(b.Station),Offset:num(b.Offset),
+    DateStarted:dte(b.DateStarted),DateCompleted:dte(b.DateCompleted),Geologist:txt(b.LoggedBy),Driller:txt(b.Driller),
+    DrillMachine:txt(b.DrillRig),DrillMethod:txt(b.DrillMethod),HammerType:txt(b.HammerType),
+    Termination:txt(b.Termination),"In-On":txt(b.InOn),Term_Origin:txt(termOrigin(b)),
+    CaveDepth:num(b.CaveDepth),GW_0hr:b.GW0Status==="Water"?num(b.GW0Depth):null,GW_24hr:b.GW24Status==="Water"?num(b.GW24Depth):null,
+    Borehole0hr:b.GW0Status==="Dry"?txt("Dry"):"",Borehole24hr:b.GW24Status==="Dry"?txt("Dry"):"",
+    DateGW:dte(b.DateGW),"Suppress 0 hr GW":0}));
+  const lith=[];
+  bs.forEach(b=>{let prev=null;effOrigins(b).forEach(({x,origin,raw})=>{
+    const surf=isSurface(x);
+    lith.push({PointID:txt(b.PointID),Depth:num(x.Depth),Bottom:num(x.Bottom),LayerLineType:txt(x.LayerLineType),
+      Origin:origin!==prev?txt(origin):"",Shade:txt(x.Shade),ColorMod:txt(x.ColorMod),Color1:txt(x.Color1),ColorConj:txt(x.ColorConj),Color2:txt(x.Color2),
+      ClassMod1:txt(x.ClassMod1),ClassMod2:txt(x.ClassMod2),Class:surf?"":txt((x.GroupName||NAMES[x.USCS]||"").toUpperCase()),Symbol:surf?"":txt(x.USCS),
+      Rock:txt(x.Rock),ClassCon:txt(x.ClassCon),Remarks1:txt(x.Remarks1),Remarks2:txt(x.Remarks2),Remarks3:txt(x.Remarks3),
+      Remarks4:txt(x.Remarks4||(surf?inches(x):"")),Graphic:txt(graphicFor(x,raw||(ROCKY.has(x.Geology)?x.Geology:"")))});
+    prev=origin;
+  })});
+  const samp=[];
+  bs.forEach(b=>{
+    const rows=byDepth(b.samples||[]).map(s=>{const sl=s.SampleType==="SS"||!s.SampleType?blowSlots(s):["","","",""];
+      return {PointID:txt(b.PointID),Depth:num(s.Depth),Length:num(penFt(s)),Type:txt(s.SampleType),Number:txt(s.SampleID),
+        "Blows 1st":txt(sl[0]),"Blows 2nd":txt(sl[1]),"Blows 3rd":txt(sl[2]),"Blows 4th":txt(sl[3]),
+        BlowCountNote:txt(refText(s)),Moisture:txt(s.Moisture)}});
+    /* Blow-count graph steps to 100 at the top of PWR / WR, as in the example. */
+    byDepth(b.strata||[]).forEach(x=>{if((x.Geology==="PWR"||x.Geology==="WR")&&x.GraphLine100!=="No"&&isNum(x.Depth)&&x.Depth>0&&!rows.some(r=>r.Depth===x.Depth))
+      rows.push({PointID:txt(b.PointID),Depth:x.Depth,Length:0,BlowGraphLine:100})});
+    rows.sort((a,c)=>a.Depth-c.Depth);samp.push(...rows);
+  });
+  return [["PROJECT",project],["POINT",point],["LITHOLOGY",lith],["SAMPLE",samp]].map(([name,rows])=>({name,cols:GINT[name],rows}));
+}
+
+/* Minimal .xlsx writer matching the gINT example: row 1 field names, row 2 captions, row 3 units,
+   data from row 4; text cells carry Excel's leading-apostrophe flag like the example's. */
+const XL=(()=>{
+  const enc=new TextEncoder();
+  const T=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;T[n]=c>>>0}
+  const crc=b=>{let c=0xFFFFFFFF;for(let i=0;i<b.length;i++)c=T[(c^b[i])&255]^(c>>>8);return(c^0xFFFFFFFF)>>>0};
+  function zip(files){
+    const parts=[],cent=[];let off=0;
+    for(const f of files){
+      const nm=enc.encode(f.name),d=enc.encode(f.text),c=crc(d);
+      const h=new DataView(new ArrayBuffer(30));
+      h.setUint32(0,0x04034b50,true);h.setUint16(4,20,true);h.setUint16(12,0x21,true);h.setUint32(14,c,true);h.setUint32(18,d.length,true);h.setUint32(22,d.length,true);h.setUint16(26,nm.length,true);
+      parts.push(new Uint8Array(h.buffer),nm,d);
+      const z=new DataView(new ArrayBuffer(46));
+      z.setUint32(0,0x02014b50,true);z.setUint16(4,20,true);z.setUint16(6,20,true);z.setUint16(14,0x21,true);z.setUint32(16,c,true);z.setUint32(20,d.length,true);z.setUint32(24,d.length,true);z.setUint16(28,nm.length,true);z.setUint32(42,off,true);
+      cent.push(new Uint8Array(z.buffer),nm);
+      off+=30+nm.length+d.length;
+    }
+    const cs=cent.reduce((a,b)=>a+b.length,0),e=new DataView(new ArrayBuffer(22));
+    e.setUint32(0,0x06054b50,true);e.setUint16(8,files.length,true);e.setUint16(10,files.length,true);e.setUint32(12,cs,true);e.setUint32(16,off,true);
+    const all=[...parts,...cent,new Uint8Array(e.buffer)],out=new Uint8Array(all.reduce((a,b)=>a+b.length,0));let p=0;for(const a of all){out.set(a,p);p+=a.length}return out;
+  }
+  const x=v=>String(v).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+  const colL=i=>{let s="";i++;while(i>0){const m=(i-1)%26;s=String.fromCharCode(65+m)+s;i=Math.floor((i-1)/26)}return s};
+  const serial=d=>(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())-Date.UTC(1899,11,30))/864e5;
+  /* Number formats used by the example; style ids: 0 General, 1 text with apostrophe flag, then one per format. */
+  const FMT={"0.0":165,"0.00":166,"0":1,"m/d/yyyy\\ h:mm:ss\\ AM/PM":164};
+  const STY={"General":0,"text":1,"m/d/yyyy\\ h:mm:ss\\ AM/PM":2,"0.0":3,"0.00":4,"0":5};
+  return function(sheets){
+    const sst=[],sidx=new Map();
+    const si=v=>{v=String(v);if(!sidx.has(v)){sidx.set(v,sst.length);sst.push(v)}return sidx.get(v)};
+    function cell(v,ref,fmt){
+      if(v===null||v===undefined||v==="")return"";
+      if(v instanceof Date)return `<c r="${ref}" s="2"><v>${serial(v)}</v></c>`;
+      if(typeof v==="number"&&isFinite(v))return `<c r="${ref}" s="${STY[fmt]??0}"><v>${v}</v></c>`;
+      const t=typeof v==="object"?v.t:String(v);if(t==="")return"";
+      return `<c r="${ref}" t="s" s="1"><v>${si(t)}</v></c>`;
+    }
+    function hdrCell(v,ref,quote){if(v==null||v==="")return"";return `<c r="${ref}" t="s"${quote?' s="1"':""}><v>${si(v)}</v></c>`}
+    function sheetXml(sh){
+      const cols=sh.cols;
+      const head=[0,1,2].map(r=>`<row r="${r+1}">${cols.map((c,ci)=>hdrCell(c[r],colL(ci)+(r+1),r>0&&ci===0)).join("")}</row>`).join("");
+      const body=sh.rows.map((row,ri)=>{const r=ri+4;return `<row r="${r}">${cols.map((c,ci)=>cell(row[c[0]],colL(ci)+r,c[3])).join("")}</row>`}).join("");
+      const widths=cols.map((c,i)=>`<col min="${i+1}" max="${i+1}" width="${c[4]||9.14}" customWidth="1"/>`).join("");
+      return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:${colL(cols.length-1)}${Math.max(3,sh.rows.length+3)}"/><sheetViews><sheetView workbookViewId="0"/></sheetViews><sheetFormatPr defaultRowHeight="15"/><cols>${widths}</cols><sheetData>${head}${body}</sheetData></worksheet>`;
+    }
+    const M="http://schemas.openxmlformats.org/spreadsheetml/2006/main",R="http://schemas.openxmlformats.org/officeDocument/2006/relationships",PK="http://schemas.openxmlformats.org/package/2006",X='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
+    const sheetFiles=sheets.map((s,i)=>({name:`xl/worksheets/sheet${i+1}.xml`,text:sheetXml(s)}));
+    const xf=(fmt,extra)=>`<xf numFmtId="${fmt}" fontId="0" fillId="0" borderId="0" xfId="0"${fmt?' applyNumberFormat="1"':""}${extra||""}/>`;
+    const files=[
+      {name:"[Content_Types].xml",text:X+`<Types xmlns="${PK}/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/><Override PartName="/xl/sharedStrings.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/>${sheets.map((s,i)=>`<Override PartName="/xl/worksheets/sheet${i+1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join("")}</Types>`},
+      {name:"_rels/.rels",text:X+`<Relationships xmlns="${PK}/relationships"><Relationship Id="rId1" Type="${R}/officeDocument" Target="xl/workbook.xml"/></Relationships>`},
+      {name:"xl/workbook.xml",text:X+`<workbook xmlns="${M}" xmlns:r="${R}"><sheets>${sheets.map((s,i)=>`<sheet name="${x(s.name)}" sheetId="${i+1}" r:id="rId${i+1}"/>`).join("")}</sheets></workbook>`},
+      {name:"xl/_rels/workbook.xml.rels",text:X+`<Relationships xmlns="${PK}/relationships">${sheets.map((s,i)=>`<Relationship Id="rId${i+1}" Type="${R}/worksheet" Target="worksheets/sheet${i+1}.xml"/>`).join("")}<Relationship Id="rId${sheets.length+1}" Type="${R}/styles" Target="styles.xml"/><Relationship Id="rId${sheets.length+2}" Type="${R}/sharedStrings" Target="sharedStrings.xml"/></Relationships>`},
+      {name:"xl/styles.xml",text:X+`<styleSheet xmlns="${M}"><numFmts count="3"><numFmt numFmtId="164" formatCode="m/d/yyyy\\ h:mm:ss\\ AM/PM"/><numFmt numFmtId="165" formatCode="0.0"/><numFmt numFmtId="166" formatCode="0.00"/></numFmts><fonts count="1"><font><sz val="11"/><name val="Aptos Narrow"/><family val="2"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="6">${xf(0)}${xf(0,' quotePrefix="1"')}${xf(164)}${xf(165)}${xf(166)}${xf(1)}</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`},
+      ...sheetFiles,
+      {name:"xl/sharedStrings.xml",text:X+`<sst xmlns="${M}" count="${sst.length}" uniqueCount="${sst.length}">${sst.map(v=>`<si><t xml:space="preserve">${x(v)}</t></si>`).join("")}</sst>`}
+    ];
+    return zip(files);
+  };
+})();
+function b64(bytes){let s="";for(let i=0;i<bytes.length;i+=0x8000)s+=String.fromCharCode.apply(null,bytes.subarray(i,i+0x8000));return btoa(s)}
+function saveFile(name,bytes,mime){
+  if(NB){const r=NB.saveToDownloads(name,b64(bytes),mime);return r==="ok"?{ok:true}:{ok:false,msg:r}}
+  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([bytes],{type:mime}));a.download=name;document.body.appendChild(a);a.click();a.remove();return{ok:true,browser:true};
+}
+function webSave(name,bytes,mime,label){
+  let file=null;try{file=new File([bytes],name,{type:mime})}catch(e){}
+  const download=()=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([bytes],{type:mime}));a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),60000);closeSheet();toast(label+" downloaded")};
+  if(file&&navigator.canShare&&navigator.share){
+    let ok=false;try{ok=navigator.canShare({files:[file]})}catch(e){}
+    if(ok){navigator.share({files:[file]}).then(()=>{closeSheet();toast(label+" sent")}).catch(e=>{if(e&&e.name==="AbortError")toast("Cancelled");else download()});return}
+  }
+  download();
+}
+function savedSheet(title,name,subject){
+  openSheet(title,`<p>Saved to <b>Downloads › FalconLogs</b> as</p><p class="calc" style="word-break:break-all">${esc(name)}</p><p class="meta">Send it now by email, Drive or Teams, or copy it to your computer later.</p>
+    <div class="actions" style="margin-top:12px">${NB?`<button type="button" class="btn pri" data-act="share" data-s="${esc(subject)}">Send…</button>`:""}<button type="button" class="btn" data-act="cancel">Done</button></div>`,{});
+}
+function doExport(p){
+  const name=`${String(p.ProjectID||"project").replace(/[^\w.-]+/g,"_")}_gINT_${today()}.xlsx`;
+  let bytes; try{bytes=XL(buildSheets(p))}catch(e){return err("Couldn't build the workbook: "+e.message)}
+  if(!NB)return webSave(name,bytes,"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","Workbook");
+  const r=saveFile(name,bytes,"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  if(!r.ok)return err("Couldn't save the workbook: "+r.msg);
+  if(r.browser){closeSheet();toast("Workbook downloaded");return}
+  savedSheet("Workbook saved",name,`${p.ProjectID} boring logs (gINT import)`);
+}
+function doBackup(){
+  const live={projects:{},borings:{}};
+  Object.values(S.projects).forEach(p=>{if(!p.deleted&&!p.example)live.projects[p.id]=p});
+  Object.values(S.borings).forEach(b=>{if(!b.deleted&&live.projects[b.pid])live.borings[b.id]=b});
+  const n=Object.keys(live.projects).length;
+  if(!n){toast("Nothing to back up yet");return}
+  const name=`FalconLogs-backup-${today()}.json`;
+  const data=new TextEncoder().encode(JSON.stringify({app:"FalconLogs",version:1,saved:new Date().toISOString(),...live}));
+  if(!NB)return webSave(name,data,"application/json","Backup");
+  const r=saveFile(name,data,"application/json");
+  if(!r.ok){toast("Backup failed: "+r.msg);return}
+  if(r.browser){toast("Backup downloaded");return}
+  savedSheet(`Backed up ${n} project${n===1?"":"s"}`,name,"Falcon Logs backup");
+}
+function restoreSheet(){
+  openSheet("Restore a backup",`<p class="meta">Pick a <b>FalconLogs-backup</b> (or older BoringLog-backup) .json file. Projects and borings in the backup replace the same ones on this phone. Anything else on the phone is kept.</p>
+    <label class="fld" for="restoreFile"><span class="lbl">Backup file</span><input id="restoreFile" type="file" accept=".json,application/json,text/plain"></label>`,{});
+  document.getElementById("restoreFile").addEventListener("change",ev=>{
+    const f=ev.target.files&&ev.target.files[0]; if(!f)return;
+    const rd=new FileReader();
+    rd.onload=()=>{
+      let o; try{o=JSON.parse(rd.result)}catch(e){return err("That file isn't a Falcon Logs backup.")}
+      if(!o||!o.projects||!o.borings)return err("That file isn't a Falcon Logs backup.");
+      const np=Object.keys(o.projects).length,nb=Object.keys(o.borings).length;
+      confirmSheet("Restore backup?",`This loads ${np} project(s) and ${nb} boring(s) saved ${esc((o.saved||"").slice(0,10)||"on an unknown date")}. Matching projects on this phone are replaced.`,"Restore",()=>{
+        Object.assign(S.projects,o.projects);Object.assign(S.borings,o.borings);
+        if(S.projects.example&&np){delete S.projects.example;delete S.borings["example-b1"]}
+        saveLocal();closeSheet();view={name:"home"};render();toast("Backup restored");
+      });
+    };
+    rd.onerror=()=>err("Couldn't read that file.");
+    rd.readAsText(f);
+  });
+}
+
+/* ---------- web app (when not running inside the Android app) ---------- */
+const isStandalone=()=>(window.matchMedia&&matchMedia("(display-mode: standalone)").matches)||navigator.standalone===true;
+const isIOS=()=>/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
+function installHint(){
+  if(NB||isStandalone())return"";
+  if(window._installEvt)return `<div class="hint">Install Falcon Logs so it opens like an app and works offline. <button class="btn blue" style="margin-top:8px;width:100%" data-act="install">Install app</button></div>`;
+  return `<div class="hint">${isIOS()?"To install on this iPhone or iPad: tap the <b>Share</b> button in Safari, then <b>Add to Home Screen</b>.":"To install: open the browser menu, then <b>Install app</b> or <b>Add to Home screen</b>."} Installed, it opens like an app and works with no signal.</div>`;
+}
+let wakeLock=null;
+async function keepAwake(){try{if(navigator.wakeLock&&document.visibilityState==="visible")wakeLock=await navigator.wakeLock.request("screen")}catch(e){}}
+function webBoot(){
+  if("serviceWorker" in navigator&&(location.protocol==="https:"||location.hostname==="localhost"))navigator.serviceWorker.register("sw.js").catch(()=>{});
+  if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(()=>{});
+  keepAwake();document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")keepAwake()});
+  addEventListener("beforeinstallprompt",e=>{e.preventDefault();window._installEvt=e;if(view.name==="home")render()});
+  addEventListener("appinstalled",()=>{window._installEvt=null;if(view.name==="home")render();toast("Falcon Logs installed")});
+  /* Phone back gesture closes forms and steps back through screens, like the Android app. */
+  if(history.pushState){
+    history.replaceState({fl:0},"");history.pushState({fl:1},"");
+    addEventListener("popstate",()=>{if(window.appBack())history.pushState({fl:1},"");else history.back()});
+  }
+}
+
+/* ---------- phone hooks (called from MainActivity) ---------- */
+window.onLocation=(lat,lon,accM,stale)=>{
+  const set=(k,v)=>{const el=document.getElementById("f_"+k);if(el)el.value=v};
+  set("Latitude",lat.toFixed(6));set("Longitude",lon.toFixed(6));if(accM>=0)set("GPS_Accuracy",Math.round(accM*3.28084));
+  const sp=llToNC(lat,lon);set("Easting",sp.E.toFixed(2));set("Northing",sp.N.toFixed(2));
+  const m=document.getElementById("gpsmsg"),btn=document.getElementById("gpsbtn");
+  if(btn){btn.disabled=false;btn.textContent="Use phone GPS"}
+  if(m)m.textContent=stale?"No fresh fix, so this is the phone's last known position. Check it.":accM>=0?`Fix to about ${Math.round(accM*3.28084)} ft.${accM*3.28084>15?" That's loose; wait a minute and try again for a better fix.":""}`:"Location filled in.";
+};
+window.onLocationError=msg=>{
+  const m=document.getElementById("gpsmsg"),btn=document.getElementById("gpsbtn");
+  if(btn){btn.disabled=false;btn.textContent="Use phone GPS"} if(m)m.textContent=msg; else toast(msg);
+};
+window.appBack=()=>{
+  if(!sheet.hidden){closeSheet();return true}
+  if(view.name==="boring"){view={name:"project",pid:S.borings[view.bid].pid};render();scrollTo(0,0);return true}
+  if(view.name==="project"){view={name:"home"};render();scrollTo(0,0);return true}
+  return false;
+};
+
+/* ---------- events ---------- */
+let toastT=null;
+function toast(m){const t=document.getElementById("toast");t.textContent=m;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,2400)}
+document.addEventListener("click",e=>{
+  const chip=e.target.closest(".chip");
+  if(chip){const g=chip.parentElement;if(g.dataset.multi!=="1"){const was=chip.classList.contains("on");g.querySelectorAll(".chip").forEach(c=>{c.classList.remove("on");c.setAttribute("aria-pressed","false")});if(!was){chip.classList.add("on");chip.setAttribute("aria-pressed","true")}}else{chip.classList.toggle("on");chip.setAttribute("aria-pressed",chip.classList.contains("on"))}if(cur&&cur.onInput)cur.onInput({target:g});return}
+  if(e.target===sheet){closeSheet();return}
+  const a=e.target.closest("[data-act]"); if(!a)return;
+  const act=a.dataset.act,id=a.dataset.id,b=view.bid?S.borings[view.bid]:null;
+  switch(act){
+    case"home":view={name:"home"};render();break;
+    case"openP":view={name:"project",pid:id};render();scrollTo(0,0);break;
+    case"openB":view={name:"boring",bid:id,tab:"samples"};render();scrollTo(0,0);break;
+    case"newP":projectSheet(null);break;
+    case"editP":projectSheet(S.projects[view.pid]);break;
+    case"newB":boringSheet(null);break;
+    case"editB":boringSheet(b);break;
+    case"close":closeoutSheet(b);break;
+    case"tab":view.tab=a.dataset.t;render();break;
+    case"newS":sampleSheet(b,null);break;
+    case"editS":sampleSheet(b,b.samples.find(x=>x.id===id));break;
+    case"newL":strataSheet(b,null);break;
+    case"editL":strataSheet(b,b.strata.find(x=>x.id===id));break;
+    case"editGW":gwSheet(b);break;
+    case"fill":{const inp=document.getElementById(a.dataset.t);if(inp){inp.value=a.dataset.v;if(cur&&cur.onInput)cur.onInput({target:inp})}break}
+    case"newR":simpleSheet(b,"remarks",REM_F,null,"Drilling note",{Depth:maxDepth(b)||""},"Note");break;
+    case"editR":simpleSheet(b,"remarks",REM_F,b.remarks.find(x=>x.id===id),"Drilling note",null,"Note");break;
+    case"export":exportSheet();break;
+    case"backup":doBackup();break;
+    case"restore":restoreSheet();break;
+    case"share":if(NB)NB.shareLast(a.dataset.s||"");break;
+    case"gps":if(NB){a.disabled=true;a.textContent="Getting a GPS fix…";const m=document.getElementById("gpsmsg");if(m)m.textContent="Hold the phone up with a clear view of the sky. This can take up to 45 seconds.";NB.getLocation()}else if(navigator.geolocation){a.disabled=true;a.textContent="Getting a GPS fix…";const m=document.getElementById("gpsmsg");if(m)m.textContent="Hold the phone up with a clear view of the sky. This can take up to 45 seconds.";
+      navigator.geolocation.getCurrentPosition(p=>window.onLocation(p.coords.latitude,p.coords.longitude,isNum(p.coords.accuracy)?p.coords.accuracy:-1,false),
+        e=>window.onLocationError(e.code===1?"Location is blocked for this app. On iPhone: Settings › Privacy & Security › Location Services › Safari Websites › While Using. On Android: tap the lock icon or app info and allow Location.":e.code===3?"No GPS fix yet. Move into the open and try again.":"Couldn't get a location. Turn on Location and try again."),
+        {enableHighAccuracy:true,timeout:45000,maximumAge:0})}
+      else{const m=document.getElementById("gpsmsg");if(m)m.textContent="This browser can't share its location. Type the coordinates here."}break;
+    case"install":if(window._installEvt){window._installEvt.prompt();window._installEvt.userChoice.finally(()=>{window._installEvt=null;render()})}break;
+    case"cancel":closeSheet();break;
+    case"del":if(cur&&cur.del)cur.del();break;
+    case"resetDesc":if(window._resetDesc)window._resetDesc();break;
+    case"step":{const inp=document.getElementById("f_"+a.dataset.t);const v=Number(inp.value)||0;inp.value=Math.max(0,v+Number(a.dataset.d));if(cur&&cur.onInput)cur.onInput({target:inp});break}
+  }
+});
+document.addEventListener("submit",e=>{e.preventDefault();if(cur&&cur.save)cur.save()});
+document.addEventListener("input",e=>{if(cur&&cur.onInput&&panel.contains(e.target))cur.onInput(e)});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!sheet.hidden)closeSheet()});
+
+/* ---------- boot ---------- */
+S=loadLocal(); if(!S){S=blank();seedExample()}
+migrate();
+render();
+if(!NB)webBoot();
+</script>
+</body></html>
