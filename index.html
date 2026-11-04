@@ -288,6 +288,10 @@ function originKeys(b){
   else effOrigins(b).forEach(({x,raw})=>{if(!isSurface(x))m.set(x.id,okey(raw))});
   return m;
 }
+/* City / State for NON-NCDOT projects; older projects stored "City, ST" in Location. */
+function projCity(p){if(p.City!=null)return p.City;const m=String(p.Location||"").match(/^(.*?),\s*([A-Za-z .]+)$/);return m?m[1].trim():(p.Location||"")}
+function projState(p){if(p.State!=null)return p.State;const m=String(p.Location||"").match(/^(.*?),\s*([A-Za-z .]+)$/);return m?m[2].trim():""}
+function projLoc(p){if(!p)return"";if(p.City!=null||p.State!=null)return [p.City,p.State].filter(Boolean).join(", ");return p.Location||""}
 function wrIds(b){
   const ids=new Set();
   if(isNCb(b))ncOrigins(b).forEach(({x,origin})=>{if(origin==="Weathered Rock"&&x.nPave!=="Yes")ids.add(x.id)});
@@ -435,6 +439,7 @@ function seedExample(){
 
 /* ---------- upgrade data saved by earlier versions ---------- */
 function migrate(){
+  Object.values(S.projects).forEach(p=>(p.dailies||[]).forEach(d=>(d.acts||[]).forEach(a=>{a.Start=round15(a.Start);a.Stop=round15(a.Stop)})));
   Object.values(S.borings).forEach(b=>(b.core||[]).forEach(c=>{if(c.Origin==="Non-Crystalline")c.Origin="Non-Crystalline Rock";if(c.Origin==="Crystalline")c.Origin="Crystalline Rock"}));
   Object.values(S.borings).forEach(b=>(b.strata||[]).forEach(x=>{if(x.Consistency){if(!x.Density)x.Density=x.Consistency;x.Consistency=""}}));
   const COLOR_SPLIT=c=>{
@@ -624,7 +629,7 @@ function render(){
 }
 function vHome(){
   const ps=projs();
-  const rows=ps.map(p=>{const bs=bors(p.id);return `<button class="row" data-act="openP" data-id="${p.id}"><div class="main"><div class="t">${esc(p.ProjectName||"Untitled project")} ${p.example?'<span class="pill ex">Example</span>':""}${isNC(p)?' <span class="pill">NCDOT</span>':""}</div><div class="s">${esc(p.ProjectID)} · ${bs.length} boring${bs.length===1?"":"s"}${p.Location?" · "+esc(p.Location):""}</div></div><span aria-hidden="true">›</span></button>`}).join("");
+  const rows=ps.map(p=>{const bs=bors(p.id);return `<button class="row" data-act="openP" data-id="${p.id}"><div class="main"><div class="t">${esc(p.ProjectName||"Untitled project")} ${p.example?'<span class="pill ex">Example</span>':""}${isNC(p)?' <span class="pill">NCDOT</span>':""}</div><div class="s">${esc(p.ProjectID)} · ${bs.length} boring${bs.length===1?"":"s"}${projLoc(p)?" · "+esc(projLoc(p)):""}</div></div><span aria-hidden="true">›</span></button>`}).join("");
   return shell("Falcon Logs",null,
     `<div><h2>Projects</h2><p class="meta">Pick a project to log borings, or start a new one.</p></div>
      <div class="list">${rows||'<div class="empty">No projects yet. Tap <b>New project</b> to start.</div>'}</div>
@@ -648,7 +653,7 @@ function vProject(){
     acts=`<button class="btn" data-act="editP">Project details</button><button class="btn blue" data-act="export">Export to Excel</button>`;
   }
   return shell(p.ProjectName||"Project",{act:"home",label:"Projects"},
-    `<div><h2>${esc(p.ProjectName||"Untitled project")}</h2><p class="meta">${isNC(p)?"NCDOT · WBS ":""}${esc(p.ProjectID)}${isNC(p)&&p.TIP?" · TIP "+esc(p.TIP):""}${p.Client?" · "+esc(p.Client):""}${p.Location?" · "+esc(p.Location):""}${p.County?" · "+esc(p.County)+" County":""}</p>${p.example?'<p class="hint">This is example data so you can see how logging works. Delete it from <b>Project details</b> when you are done.</p>':""}</div>
+    `<div><h2>${esc(p.ProjectName||"Untitled project")}</h2><p class="meta">${isNC(p)?"NCDOT · WBS ":""}${esc(p.ProjectID)}${isNC(p)&&p.TIP?" · TIP "+esc(p.TIP):""}${p.Client?" · "+esc(p.Client):""}${projLoc(p)?" · "+esc(projLoc(p)):""}${p.County?" · "+esc(p.County)+" County":""}</p>${p.example?'<p class="hint">This is example data so you can see how logging works. Delete it from <b>Project details</b> when you are done.</p>':""}</div>
      <div class="tabs" role="tablist">${T("borings","Borings",bs.length)}${T("daily","Daily activity logs",ds.length)}</div>
      <div class="actions">${acts}</div>
      <div class="list">${list}</div>`,cta);
@@ -666,7 +671,9 @@ function usDate(v){const m=String(v||"").match(/^(\d{4})-(\d\d)-(\d\d)$/);return
 function weekday(v){const m=String(v||"").match(/^(\d{4})-(\d\d)-(\d\d)$/);return m?["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][new Date(+m[1],+m[2]-1,+m[3]).getDay()]:""}
 const ACT_PRESETS=["Drill Crew Travel to Site","Geo Travel to Site","Drill Prep","Drilling","Rock Coring","Pulling Steel / Clean Up","Setting Casing","Moving Rig","Water Haul","Standby","Drill Crew Travel from Site","Geo Travel from Site"];
 const WEATHER=["Sunny","Partly Cloudy","Cloudy","Rain","Windy","Cold","Hot"];
-function nowHM(){const d=new Date();let m=Math.round((d.getHours()*60+d.getMinutes())/5)*5;if(m>=1440)m=1435;return String(Math.floor(m/60)).padStart(2,"0")+":"+String(m%60).padStart(2,"0")}
+/* All daily-log times are kept on 15-minute marks. */
+function round15(t){const m=hm(t);if(m==null)return t||"";let r=Math.round(m/15)*15;if(r>=1440)r=1425;return String(Math.floor(r/60)).padStart(2,"0")+":"+String(r%60).padStart(2,"0")}
+function nowHM(){const d=new Date();return round15(String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0"))}
 
 function vDaily(){
   const p=S.projects[view.pid],d=(p.dailies||[]).find(x=>x.id===view.did);
@@ -723,7 +730,7 @@ function activitySheet(p,d,a){
   const isNew=!a,acts=sortedActs(d);
   if(isNew){const last=acts.filter(x=>x.Stop).sort((x,y)=>hm(y.Stop)-hm(x.Stop))[0];a={Start:last?last.Stop:nowHM(),Stop:"",Activity:"",Location:""}}
   const locs=[...new Set((p.dailies||[]).flatMap(x=>(x.acts||[]).map(y=>y.Location)).filter(Boolean))].slice(0,4);
-  const tf=(k,l)=>`<div class="fld half"><label class="lbl" for="f_${k}">${l}</label><div class="tpair"><input id="f_${k}" data-k="${k}" type="time" step="300" value="${esc(a[k]||"")}"><button type="button" class="btn" data-act="nowT" data-t="f_${k}">Now</button></div></div>`;
+  const tf=(k,l)=>`<div class="fld half"><label class="lbl" for="f_${k}">${l}</label><div class="tpair"><input id="f_${k}" data-k="${k}" type="time" step="900" value="${esc(a[k]||"")}"><button type="button" class="btn" data-act="nowT" data-t="f_${k}">Now</button></div></div>`;
   const body=`<div class="grid">${tf("Start","Start")}${tf("Stop","Stop")}</div>
     <div class="calc" id="acalc" style="margin-top:12px"></div>
     <div class="grid" style="margin-top:12px">
@@ -731,12 +738,13 @@ function activitySheet(p,d,a){
       <div class="chips quick">${ACT_PRESETS.map(o=>`<button type="button" class="qchip" data-act="fill" data-t="f_Activity" data-v="${esc(o)}">${esc(o)}</button>`).join("")}</div>
       ${bors(p.id).length?`<small>Boring: ${bors(p.id).map(b=>`<button type="button" class="qchip" data-act="prepend" data-t="f_Activity" data-v="${esc(b.PointID)}">${esc(b.PointID)}</button>`).join(" ")}</small>`:""}</div>
     ${F({k:"Location",l:"Location",t:locs.length?"fill":"",o:locs,h:"For travel rows, e.g. Raleigh to Chatham Co."},a.Location)}
+    <p class="note" style="grid-column:1/-1;margin:0">Times are rounded to the nearest 15 minutes.</p>
     </div>`;
   openSheet(isNew?"Add activity":"Activity",body,{focus:false,onInput(){
-    const {out}=readForm(panel),h=actHours(out);
-    document.getElementById("acalc").innerHTML=`<span>Total time <b>${h==null?"–":h.toFixed(2)+" hrs"}</b></span>`;
+    const {out}=readForm(panel);out.Start=round15(out.Start);out.Stop=round15(out.Stop);const h=actHours(out);
+    document.getElementById("acalc").innerHTML=`<span>Total time <b>${h==null?"–":h.toFixed(2)+" hrs"}</b></span>${out.Start||out.Stop?`<span>Saved as <b>${esc(t12(out.Start)||"–")} – ${esc(t12(out.Stop)||"–")}</b></span>`:""}`;
   },save(){
-    const {out}=readForm(panel);if(!out.Activity)return err("Describe the activity.");
+    const {out}=readForm(panel);out.Start=round15(out.Start);out.Stop=round15(out.Stop);if(!out.Activity)return err("Describe the activity.");
     if(hm(out.Start)!=null&&hm(out.Stop)!=null&&hm(out.Stop)<hm(out.Start))return err("Stop time is before the start time. Check AM/PM.");
     if(!d.acts)d.acts=[];
     if(isNew)d.acts.push(Object.assign({id:uid()},out));else Object.assign(a,out);
@@ -964,10 +972,10 @@ function projectSheet(p){
   const body=`<div class="grid">${F({k:"ProjType",l:"Project type",t:"chips",o:["NCDOT","NON-NCDOT"],h:"NCDOT uses AASHTO classification and the NCDOT Excel layout. NON-NCDOT uses USCS and your standard layout."},p.ProjType==="NCDOT"?"NCDOT":"NON-NCDOT")}</div>
     <div class="grid" style="margin-top:12px">
     ${F({k:"ProjectID",l:"Project number",req:1},p.ProjectID)}${F({k:"ProjectName",l:"Project name",req:1},p.ProjectName)}</div>
-    <div id="pj_com"><div class="grid" style="margin-top:12px">${F({k:"Client",l:"Client"},p.Client)}${F({k:"Location",l:"Location",h:"City, state"},p.Location)}</div></div>
+    <div id="pj_com"><div class="grid" style="margin-top:12px">${F({k:"Client",l:"Client"},p.Client)}<h3 class="sec">Location</h3>${F({k:"City",l:"City",w:"half"},projCity(p))}${F({k:"State",l:"State",w:"half",h:"e.g. NC"},projState(p))}</div></div>
     <div id="pj_nc"><div class="grid" style="margin-top:12px">${F({k:"TIP",l:"TIP number",h:"e.g. I-5719C"},p.TIP)}
       ${F({k:"SiteDesc",l:"Site description",h:"Copied to each boring, e.g. Ozark Road and Grove Street Interchange Improvements"},p.SiteDesc)}</div></div>
-    <div class="grid" style="margin-top:12px">${F({k:"County",l:"County"},p.County)}</div>`;
+    <div class="grid" style="margin-top:12px">${F({k:"County",l:"County",h:"Exported to the County column"},p.County)}</div>`;
   openSheet(isNew?"New project":"Project details",body,{focus:isNew,onInput(){
     const {out}=readForm(panel),nc=out.ProjType==="NCDOT";
     document.getElementById("pj_com").hidden=nc;document.getElementById("pj_nc").hidden=!nc;
@@ -975,6 +983,7 @@ function projectSheet(p){
   },save(){
     const {out,bad}=readForm(panel); if(!out.ProjectID||!out.ProjectName)return err("Enter a project number and name.");
     out.ProjType=out.ProjType==="NCDOT"?"NCDOT":"Commercial";
+    if(out.ProjType!=="NCDOT"){out.City=(out.City||"").trim();out.State=(out.State||"").trim().toUpperCase();out.Location=[out.City,out.State].filter(Boolean).join(", ")}
     const id=isNew?uid():p.id; S.projects[id]=Object.assign(S.projects[id]||{id},out,{id,touched:true});
     touch("p",id); closeSheet(); view={name:"project",pid:id}; render(); toast(isNew?"Project created":"Project saved");
   },del:isNew?null:()=>confirmSheet("Delete project?",`This removes <b>${esc(p.ProjectName)}</b> and its ${bors(p.id).length} boring(s) from this phone and your backup. Export first if you need the data.`,"Delete project",()=>{
@@ -1591,7 +1600,7 @@ function buildSheetsNC(p){
 function buildSheets(p){
   if(isNC(p))return buildSheetsNC(p);
   const bs=bors(p.id),txt=v=>v==null||v===""?"":{t:String(v)};
-  const project=[{Client:txt(p.Client),Number:txt(p.ProjectID),Name:txt(p.ProjectName),Location:txt(p.Location),County:txt(p.County),
+  const project=[{Client:txt(p.Client),Number:txt(p.ProjectID),Name:txt(p.ProjectName),Location:txt(projLoc(p)),County:txt(p.County),
     HALogScale:1,Water_Unit_Wt:62.42769,Preliminary:-1}];
   const point=bs.map(b=>({
     PointID:txt(b.PointID),HoleDepth:num(b.HoleDepth),East:num(b.Easting),North:num(b.Northing),Elevation:num(b.Elevation),
